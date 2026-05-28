@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { aiService } from "@/services/ai-service";
+import { analyzeBidRisk, summarizeOpportunity } from "@/services/ai-service";
+import { getCurrentUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import { mockOpportunities } from "@/data/mock-opportunities";
 
 // POST /api/ai/analyze - Run AI analysis on an opportunity
@@ -14,22 +16,55 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let opportunity;
-  if (opportunityId) {
-    opportunity = mockOpportunities.find((opp) => opp.id === opportunityId);
-    if (!opportunity) {
-      return NextResponse.json({ error: "Opportunity not found" }, { status: 404 });
-    }
-  }
-
   try {
-    let analysis;
-    if (opportunity) {
-      analysis = await aiService.analyzeBidRisk(opportunity);
+    let opportunity;
+
+    if (opportunityId) {
+      // Try database first
+      try {
+        const dbOpp = await prisma.opportunity.findUnique({
+          where: { id: opportunityId },
+        });
+        if (dbOpp) {
+          opportunity = {
+            id: dbOpp.id,
+            title: dbOpp.title,
+            agency: dbOpp.agency,
+            solicitationNumber: dbOpp.solicitationNumber,
+            naicsCode: dbOpp.naicsCode,
+            pscCode: dbOpp.pscCode,
+            setAsideType: dbOpp.setAsideType,
+            dueDate: dbOpp.dueDate.toISOString(),
+            estimatedValue: Number(dbOpp.estimatedValue),
+            source: dbOpp.source as any,
+            status: dbOpp.status as any,
+            matchScore: dbOpp.matchScore || 50,
+            riskScore: dbOpp.riskScore || 50,
+            description: dbOpp.description || "",
+            requirements: dbOpp.requirements,
+            deliveryRequirements: dbOpp.deliveryRequirements || undefined,
+            placeOfPerformance: dbOpp.placeOfPerformance || undefined,
+            pointOfContact: dbOpp.pointOfContact || undefined,
+            postedDate: dbOpp.postedDate.toISOString(),
+            responseDate: dbOpp.responseDate.toISOString(),
+          };
+        }
+      } catch {
+        // Database unavailable, try mock
+      }
+
+      // Fallback to mock data
+      if (!opportunity) {
+        opportunity = mockOpportunities.find((opp) => opp.id === opportunityId);
+      }
+
+      if (!opportunity) {
+        return NextResponse.json({ error: "Opportunity not found" }, { status: 404 });
+      }
     } else {
-      // For text-based analysis, create a temporary opportunity object
-      const tempOpportunity = {
-        id: "temp",
+      // Text-based analysis
+      opportunity = {
+        id: "custom-analysis",
         title: "Custom Analysis",
         agency: "Unknown",
         solicitationNumber: "N/A",
@@ -47,7 +82,52 @@ export async function POST(request: NextRequest) {
         postedDate: new Date().toISOString(),
         responseDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       };
-      analysis = await aiService.analyzeBidRisk(tempOpportunity);
+    }
+
+    // Run AI analysis
+    const analysis = await analyzeBidRisk(opportunity);
+
+    // Save analysis to database if user is authenticated
+    try {
+      const user = await getCurrentUser();
+      if (user && opportunityId) {
+        await prisma.opportunityAnalysis.create({
+          data: {
+            opportunityId: opportunity.id,
+            userId: user.id,
+            summary: analysis.summary,
+            bidRecommendation: analysis.bidRecommendation,
+            confidenceScore: analysis.confidenceScore,
+            difficultyScore: analysis.difficultyScore,
+            complianceRequirements: analysis.complianceRequirements,
+            capitalConcerns: analysis.capitalConcerns,
+            supplierNeeds: analysis.supplierNeeds,
+            fulfillmentRisks: analysis.fulfillmentRisks,
+            timelineRisks: analysis.timelineRisks,
+            marginConsiderations: analysis.marginConsiderations,
+            questionsToAsk: analysis.questionsToAsk,
+            recommendedNextSteps: analysis.recommendedNextSteps,
+            aiProvider: process.env.AI_PROVIDER || "mock",
+            aiModel: process.env.AI_MODEL || "mock",
+          },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            action: "ai_analysis_created",
+            entityType: "opportunity_analysis",
+            entityId: opportunity.id,
+            details: {
+              recommendation: analysis.bidRecommendation,
+              confidence: analysis.confidenceScore,
+            },
+          },
+        });
+      }
+    } catch (dbError) {
+      // Don't fail the request if database save fails
+      console.warn("Failed to save analysis to database:", dbError);
     }
 
     return NextResponse.json({
