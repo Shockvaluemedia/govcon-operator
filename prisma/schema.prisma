@@ -1,0 +1,422 @@
+// GovCon Operator - Database Schema
+// PostgreSQL on AWS RDS, multi-tenant-ready
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Core Entities
+// ============================================================
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  avatarUrl      String?  @map("avatar_url")
+  cognitoId      String?  @unique @map("cognito_id")
+  organizationId String   @map("organization_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  userRoles          UserRole[]
+  savedOpportunities SavedOpportunity[]
+  analyses           OpportunityAnalysis[]
+  documents          Document[]
+  notes              Note[]
+  aiMessages         AIMessage[]
+  auditLogs          AuditLog[]
+  workflowTasks      WorkflowTask[]      @relation("AssignedTasks")
+
+  @@map("users")
+}
+
+model Organization {
+  id            String   @id @default(uuid())
+  name          String
+  uei           String?
+  cageCode      String?  @map("cage_code")
+  samRegistered Boolean  @default(false) @map("sam_registered")
+  naicsCodes    String[] @map("naics_codes")
+  pscCodes      String[] @map("psc_codes")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  users              User[]
+  userRoles          UserRole[]
+  savedOpportunities SavedOpportunity[]
+  suppliers          Supplier[]
+  complianceProfile  ComplianceProfile?
+  documents          Document[]
+  bidWorkflows       BidWorkflow[]
+  integrations       Integration[]
+  fundingModels      FundingCashflowModel[]
+
+  @@map("organizations")
+}
+
+model UserRole {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  organizationId String   @map("organization_id")
+  role           Role
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId, role])
+  @@map("user_roles")
+}
+
+enum Role {
+  owner
+  admin
+  operator
+  coach
+  viewer
+}
+
+// ============================================================
+// Opportunities
+// ============================================================
+
+model Opportunity {
+  id                   String   @id @default(uuid())
+  title                String
+  agency               String
+  solicitationNumber   String   @map("solicitation_number")
+  naicsCode            String   @map("naics_code")
+  pscCode              String   @map("psc_code")
+  setAsideType         String   @map("set_aside_type")
+  dueDate              DateTime @map("due_date")
+  estimatedValue       Decimal  @map("estimated_value")
+  source               String
+  status               String   @default("active")
+  matchScore           Int?     @map("match_score")
+  riskScore            Int?     @map("risk_score")
+  description          String?
+  requirements         String[]
+  deliveryRequirements String?  @map("delivery_requirements")
+  placeOfPerformance   String?  @map("place_of_performance")
+  pointOfContact       String?  @map("point_of_contact")
+  postedDate           DateTime @map("posted_date")
+  responseDate         DateTime @map("response_date")
+  archiveDate          DateTime? @map("archive_date")
+  productCategory      String?  @map("product_category")
+  certifications       String[]
+  rawData              Json?    @map("raw_data")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  savedOpportunities SavedOpportunity[]
+  analyses           OpportunityAnalysis[]
+  supplierQuotes     SupplierQuote[]
+  bidWorkflows       BidWorkflow[]
+  documents          Document[]
+  notes              Note[]
+
+  @@index([naicsCode])
+  @@index([source])
+  @@index([status])
+  @@index([dueDate])
+  @@map("opportunities")
+}
+
+model SavedOpportunity {
+  id             String   @id @default(uuid())
+  opportunityId  String   @map("opportunity_id")
+  userId         String   @map("user_id")
+  organizationId String   @map("organization_id")
+  notes          String?
+  savedAt        DateTime @default(now()) @map("saved_at")
+
+  opportunity  Opportunity  @relation(fields: [opportunityId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([opportunityId, userId])
+  @@map("saved_opportunities")
+}
+
+model OpportunityAnalysis {
+  id                     String   @id @default(uuid())
+  opportunityId          String   @map("opportunity_id")
+  userId                 String   @map("user_id")
+  summary                String
+  bidRecommendation      String   @map("bid_recommendation")
+  confidenceScore        Decimal  @map("confidence_score")
+  difficultyScore        Decimal  @map("difficulty_score")
+  complianceRequirements String[] @map("compliance_requirements")
+  capitalConcerns        String[] @map("capital_concerns")
+  supplierNeeds          String[] @map("supplier_needs")
+  fulfillmentRisks       String[] @map("fulfillment_risks")
+  timelineRisks          String[] @map("timeline_risks")
+  marginConsiderations   String[] @map("margin_considerations")
+  questionsToAsk         String[] @map("questions_to_ask")
+  recommendedNextSteps   String[] @map("recommended_next_steps")
+  aiProvider             String?  @map("ai_provider")
+  aiModel                String?  @map("ai_model")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@map("opportunity_analyses")
+}
+
+// ============================================================
+// Suppliers
+// ============================================================
+
+model Supplier {
+  id                String   @id @default(uuid())
+  name              String
+  website           String?
+  contactName       String?  @map("contact_name")
+  contactEmail      String?  @map("contact_email")
+  contactPhone      String?  @map("contact_phone")
+  productCategory   String   @map("product_category")
+  leadTime          String?  @map("lead_time")
+  unitCost          Decimal? @map("unit_cost")
+  moq               Int?
+  shippingEstimate  Decimal? @map("shipping_estimate")
+  reliabilityRating Decimal? @map("reliability_rating")
+  notes             String?
+  organizationId    String   @map("organization_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  quotes       SupplierQuote[]
+
+  @@map("suppliers")
+}
+
+model SupplierQuote {
+  id                 String   @id @default(uuid())
+  supplierId         String   @map("supplier_id")
+  opportunityId      String?  @map("opportunity_id")
+  productDescription String   @map("product_description")
+  unitPrice          Decimal  @map("unit_price")
+  quantity           Int
+  totalPrice         Decimal  @map("total_price")
+  leadTime           String?  @map("lead_time")
+  validUntil         DateTime? @map("valid_until")
+  status             String   @default("pending")
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  supplier    Supplier     @relation(fields: [supplierId], references: [id])
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
+
+  @@map("supplier_quotes")
+}
+
+// ============================================================
+// Products
+// ============================================================
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  category    String
+  sku         String?
+  unitCost    Decimal? @map("unit_cost")
+  unitPrice   Decimal? @map("unit_price")
+  naicsCode   String?  @map("naics_code")
+  pscCode     String?  @map("psc_code")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("products")
+}
+
+// ============================================================
+// Compliance
+// ============================================================
+
+model ComplianceProfile {
+  id                 String   @id @default(uuid())
+  organizationId     String   @unique @map("organization_id")
+  ueiRegistered      Boolean  @default(false) @map("uei_registered")
+  samRegistered      Boolean  @default(false) @map("sam_registered")
+  cageCode           Boolean  @default(false) @map("cage_code")
+  naicsCodes         Boolean  @default(false) @map("naics_codes")
+  pscCodes           Boolean  @default(false) @map("psc_codes")
+  businessBankAccount Boolean @default(false) @map("business_bank_account")
+  insurance          Boolean  @default(false)
+  capabilityStatement Boolean @default(false) @map("capability_statement")
+  pastPerformance    Boolean  @default(false) @map("past_performance")
+  certifications     String[]
+  setAsideEligibility String[] @map("set_aside_eligibility")
+  readinessScore     Int      @default(0) @map("readiness_score")
+  lastUpdated        DateTime @default(now()) @map("last_updated")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("compliance_profiles")
+}
+
+// ============================================================
+// Documents
+// ============================================================
+
+model Document {
+  id             String   @id @default(uuid())
+  name           String
+  type           String
+  url            String
+  size           Int
+  mimeType       String?  @map("mime_type")
+  s3Key          String?  @map("s3_key")
+  uploadedBy     String   @map("uploaded_by")
+  organizationId String   @map("organization_id")
+  opportunityId  String?  @map("opportunity_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user         User          @relation(fields: [uploadedBy], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  opportunity  Opportunity?  @relation(fields: [opportunityId], references: [id])
+
+  @@map("documents")
+}
+
+// ============================================================
+// Workflows
+// ============================================================
+
+model BidWorkflow {
+  id             String   @id @default(uuid())
+  opportunityId  String   @map("opportunity_id")
+  organizationId String   @map("organization_id")
+  stage          String   @default("discovered")
+  assignedTo     String?  @map("assigned_to")
+  priority       String   @default("medium")
+  dueDate        DateTime? @map("due_date")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  opportunity  Opportunity    @relation(fields: [opportunityId], references: [id])
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  tasks        WorkflowTask[]
+
+  @@map("bid_workflows")
+}
+
+model WorkflowTask {
+  id          String   @id @default(uuid())
+  workflowId  String   @map("workflow_id")
+  title       String
+  description String?
+  status      String   @default("pending")
+  assignedTo  String?  @map("assigned_to")
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workflow BidWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  assignee User?      @relation("AssignedTasks", fields: [assignedTo], references: [id])
+
+  @@map("workflow_tasks")
+}
+
+// ============================================================
+// Notes & AI Messages
+// ============================================================
+
+model Note {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  content     String
+  userId      String   @map("user_id")
+  opportunityId String? @map("opportunity_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User         @relation(fields: [userId], references: [id])
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("notes")
+}
+
+model AIMessage {
+  id        String   @id @default(uuid())
+  role      String
+  content   String
+  userId    String   @map("user_id")
+  sessionId String   @map("session_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([sessionId])
+  @@map("ai_messages")
+}
+
+// ============================================================
+// Audit & System
+// ============================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Integration {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  provider       String
+  status         String   @default("disconnected")
+  config         Json?
+  lastSyncAt     DateTime? @map("last_sync_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, provider])
+  @@map("integrations")
+}
+
+model FundingCashflowModel {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  contractValue  Decimal  @map("contract_value")
+  upfrontCosts   Decimal  @map("upfront_costs")
+  monthlyBurn    Decimal  @map("monthly_burn")
+  paymentTerms   Int      @map("payment_terms")
+  fundingSource  String?  @map("funding_source")
+  projections    Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("funding_cashflow_models")
+}
