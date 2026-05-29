@@ -5,7 +5,6 @@ import { Send, Bot, User, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { aiService } from "@/services/ai-service";
 
 interface Message {
   id: string;
@@ -60,10 +59,14 @@ export default function AIAssistantPage() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const response = await aiService.chat(input);
+    // Get AI response from API
+    const res = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input, sessionId: "session-1" }),
+    });
+    const data = await res.json();
+    const response = data.data?.message || "Sorry, I couldn't generate a response.";
 
     const assistantMessage: Message = {
       id: `msg-${Date.now() + 1}`,

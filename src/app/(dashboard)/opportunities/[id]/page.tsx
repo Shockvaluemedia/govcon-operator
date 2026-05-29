@@ -23,7 +23,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mockOpportunities } from "@/data/mock-opportunities";
 import { formatCurrency, formatDate, calculateDaysUntil } from "@/lib/utils";
-import { aiService } from "@/services/ai-service";
 import { OpportunityAnalysis } from "@/types";
 
 export default function OpportunityDetailPage() {
@@ -32,6 +31,7 @@ export default function OpportunityDetailPage() {
   const [analysis, setAnalysis] = useState<OpportunityAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   if (!opportunity) {
     return (
@@ -46,11 +46,42 @@ export default function OpportunityDetailPage() {
 
   const daysUntilDue = calculateDaysUntil(opportunity.dueDate);
 
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (saved) {
+        await fetch(`/api/opportunities/saved?opportunityId=${opportunity.id}`, { method: "DELETE" });
+        setSaved(false);
+      } else {
+        await fetch("/api/opportunities/saved", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opportunityId: opportunity.id }),
+        });
+        setSaved(true);
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAnalyze = async () => {
     setAnalyzing(true);
-    const result = await aiService.analyzeBidRisk(opportunity);
-    setAnalysis(result);
-    setAnalyzing(false);
+    try {
+      const res = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunityId: opportunity.id }),
+      });
+      const data = await res.json();
+      setAnalysis(data.data);
+    } catch (error) {
+      console.error("Analysis error:", error);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -70,9 +101,9 @@ export default function OpportunityDetailPage() {
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-3">
-        <Button onClick={() => setSaved(!saved)} variant={saved ? "default" : "outline"} className="gap-2">
+        <Button onClick={handleSave} disabled={saving} variant={saved ? "default" : "outline"} className="gap-2">
           <Bookmark className="h-4 w-4" />
-          {saved ? "Saved" : "Save Opportunity"}
+          {saving ? "Saving..." : saved ? "Saved" : "Save Opportunity"}
         </Button>
         <Button onClick={handleAnalyze} disabled={analyzing} className="gap-2">
           <Brain className="h-4 w-4" />
