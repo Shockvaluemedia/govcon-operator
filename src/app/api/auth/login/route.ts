@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorName = error instanceof Error ? error.name : "";
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid email or password format" },
@@ -53,14 +55,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (error.name === "NotAuthorizedException") {
+    if (errorName === "NotAuthorizedException") {
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
       );
     }
 
-    if (error.name === "UserNotConfirmedException") {
+    if (errorName === "UserNotConfirmedException") {
       return NextResponse.json(
         { error: "Please verify your email before signing in" },
         { status: 403 }

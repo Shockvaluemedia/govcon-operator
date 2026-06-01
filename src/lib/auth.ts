@@ -5,9 +5,7 @@ import {
   ConfirmSignUpCommand,
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
-  GetUserCommand,
   GlobalSignOutCommand,
-  AdminGetUserCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { cookies } from "next/headers";
@@ -87,7 +85,7 @@ export async function signUp(params: {
     },
   });
 
-  const user = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email,
       firstName,

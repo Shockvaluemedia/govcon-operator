@@ -17,7 +17,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: "Email verified successfully. You can now sign in.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorName = error instanceof Error ? error.name : "";
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid verification code format" },
@@ -25,14 +27,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (error.name === "CodeMismatchException") {
+    if (errorName === "CodeMismatchException") {
       return NextResponse.json(
         { error: "Invalid verification code" },
         { status: 400 }
       );
     }
 
-    if (error.name === "ExpiredCodeException") {
+    if (errorName === "ExpiredCodeException") {
       return NextResponse.json(
         { error: "Verification code has expired. Please request a new one." },
         { status: 400 }

@@ -1,4 +1,7 @@
 import { PrismaClient } from "@prisma/client";
+import { mockOpportunities } from "../src/data/mock-opportunities";
+import { mockSupplierQuotes, mockSuppliers } from "../src/data/mock-suppliers";
+import { mockWorkflowTasks, mockWorkflows } from "../src/data/mock-workflows";
 
 const prisma = new PrismaClient();
 
@@ -78,78 +81,14 @@ async function main() {
 
   console.log("  ✓ Compliance profile");
 
-  // Seed opportunities
-  const opportunities = [
-    {
-      id: "opp-seed-001",
-      title: "Office Supplies - Toner Cartridges and Paper Products",
-      agency: "Department of Defense - DLA",
-      solicitationNumber: "SPE7LX-24-R-0142",
-      naicsCode: "424120",
-      pscCode: "7510",
-      setAsideType: "Total Small Business",
-      dueDate: new Date("2026-06-15T17:00:00Z"),
-      estimatedValue: 125000,
-      source: "DLA",
-      status: "active",
-      matchScore: 87,
-      riskScore: 25,
-      description: "The Defense Logistics Agency is seeking qualified small businesses to provide toner cartridges, paper products, and general office supplies for military installations across the continental United States.",
-      requirements: ["Must be registered in SAM.gov", "Must have CAGE code", "Small business certification required", "Delivery within 30 days of order", "Must meet Berry Amendment requirements"],
-      deliveryRequirements: "FOB Destination, 30 days ARO",
-      placeOfPerformance: "Multiple CONUS locations",
-      postedDate: new Date("2026-05-01T00:00:00Z"),
-      responseDate: new Date("2026-06-15T17:00:00Z"),
-      productCategory: "Office Supplies",
-      certifications: ["SAM.gov", "Small Business"],
-    },
-    {
-      id: "opp-seed-002",
-      title: "IT Hardware - Laptops and Monitors for VA Medical Centers",
-      agency: "Department of Veterans Affairs",
-      solicitationNumber: "36C10X24R0089",
-      naicsCode: "423430",
-      pscCode: "7021",
-      setAsideType: "Service-Disabled Veteran-Owned Small Business",
-      dueDate: new Date("2026-06-22T14:00:00Z"),
-      estimatedValue: 450000,
-      source: "SAM.gov",
-      status: "active",
-      matchScore: 72,
-      riskScore: 45,
-      description: "The Department of Veterans Affairs requires laptops and monitors for deployment across VA Medical Centers nationwide. Equipment must meet current security standards and be TAA-compliant.",
-      requirements: ["SDVOSB certification required", "TAA-compliant products only", "Must provide 3-year warranty", "Section 508 accessibility compliance"],
-      deliveryRequirements: "FOB Destination, 45 days ARO",
-      placeOfPerformance: "VA Medical Centers Nationwide",
-      postedDate: new Date("2026-05-10T00:00:00Z"),
-      responseDate: new Date("2026-06-22T14:00:00Z"),
-      productCategory: "IT Hardware",
-      certifications: ["SDVOSB", "TAA Compliant"],
-    },
-    {
-      id: "opp-seed-003",
-      title: "Janitorial Supplies - Cleaning Products and Equipment",
-      agency: "General Services Administration",
-      solicitationNumber: "GS-07F-0142Y",
-      naicsCode: "424690",
-      pscCode: "7930",
-      setAsideType: "8(a) Business Development",
-      dueDate: new Date("2026-07-01T16:00:00Z"),
-      estimatedValue: 85000,
-      source: "SAM.gov",
-      status: "active",
-      matchScore: 91,
-      riskScore: 15,
-      description: "GSA seeks qualified 8(a) firms to provide janitorial supplies including cleaning chemicals, paper products, trash bags, and cleaning equipment for federal buildings in Region 4.",
-      requirements: ["8(a) certification required", "Green Seal or EcoLogo certified products preferred", "Must provide SDS for all chemical products", "Monthly delivery schedule"],
-      deliveryRequirements: "Monthly delivery, FOB Destination",
-      placeOfPerformance: "GSA Region 4 - Southeast",
-      postedDate: new Date("2026-05-15T00:00:00Z"),
-      responseDate: new Date("2026-07-01T16:00:00Z"),
-      productCategory: "Janitorial Supplies",
-      certifications: ["8(a)", "SAM.gov"],
-    },
-  ];
+  // Seed a full demo opportunity catalog from the same records used by mock mode.
+  const opportunities = mockOpportunities.map((opp) => ({
+    ...opp,
+    dueDate: new Date(opp.dueDate),
+    postedDate: new Date(opp.postedDate),
+    responseDate: new Date(opp.responseDate),
+    archiveDate: opp.archiveDate ? new Date(opp.archiveDate) : undefined,
+  }));
 
   for (const opp of opportunities) {
     await prisma.opportunity.upsert({
@@ -161,57 +100,12 @@ async function main() {
 
   console.log(`  ✓ ${opportunities.length} opportunities`);
 
-  // Seed suppliers
-  const suppliers = [
-    {
-      id: "sup-seed-001",
-      name: "Pacific Office Products",
-      website: "https://pacificoffice.example.com",
-      contactName: "David Park",
-      contactEmail: "david@pacificoffice.example.com",
-      contactPhone: "(555) 123-4567",
-      productCategory: "Office Supplies",
-      leadTime: "5-7 business days",
-      unitCost: 24.99,
-      moq: 100,
-      shippingEstimate: 450,
-      reliabilityRating: 4.5,
-      notes: "Reliable supplier, good bulk pricing. Has government experience.",
-      organizationId: org.id,
-    },
-    {
-      id: "sup-seed-002",
-      name: "TechDirect Solutions",
-      website: "https://techdirect.example.com",
-      contactName: "Maria Santos",
-      contactEmail: "maria@techdirect.example.com",
-      contactPhone: "(555) 234-5678",
-      productCategory: "IT Hardware",
-      leadTime: "10-14 business days",
-      unitCost: 899.00,
-      moq: 25,
-      shippingEstimate: 1200,
-      reliabilityRating: 4.2,
-      notes: "TAA-compliant products available. Good warranty support.",
-      organizationId: org.id,
-    },
-    {
-      id: "sup-seed-003",
-      name: "CleanPro Distributors",
-      website: "https://cleanpro.example.com",
-      contactName: "James Wilson",
-      contactEmail: "james@cleanpro.example.com",
-      contactPhone: "(555) 345-6789",
-      productCategory: "Janitorial Supplies",
-      leadTime: "3-5 business days",
-      unitCost: 12.50,
-      moq: 200,
-      shippingEstimate: 350,
-      reliabilityRating: 4.8,
-      notes: "Green Seal certified products. Excellent fill rates.",
-      organizationId: org.id,
-    },
-  ];
+  // Seed suppliers and quotes.
+  const suppliers = mockSuppliers.map(({ createdAt, ...supplier }) => ({
+    ...supplier,
+    organizationId: org.id,
+    createdAt: createdAt ? new Date(createdAt) : undefined,
+  }));
 
   for (const sup of suppliers) {
     await prisma.supplier.upsert({
@@ -223,39 +117,35 @@ async function main() {
 
   console.log(`  ✓ ${suppliers.length} suppliers`);
 
-  // Seed bid workflows
-  const workflows = [
-    {
-      id: "wf-seed-001",
-      opportunityId: "opp-seed-001",
-      organizationId: org.id,
-      stage: "supplier_sourcing",
-      assignedTo: user.id,
-      priority: "high",
-      dueDate: new Date("2026-06-10T00:00:00Z"),
-      notes: "Good match for our capabilities. Need to finalize supplier pricing.",
-    },
-    {
-      id: "wf-seed-002",
-      opportunityId: "opp-seed-002",
-      organizationId: org.id,
-      stage: "under_review",
-      assignedTo: user.id,
-      priority: "medium",
-      dueDate: new Date("2026-06-18T00:00:00Z"),
-      notes: "Need to verify SDVOSB eligibility and TAA compliance.",
-    },
-    {
-      id: "wf-seed-003",
-      opportunityId: "opp-seed-003",
-      organizationId: org.id,
-      stage: "pricing",
-      assignedTo: user.id,
-      priority: "high",
-      dueDate: new Date("2026-06-25T00:00:00Z"),
-      notes: "Supplier confirmed. Working on margin calculations.",
-    },
-  ];
+  const supplierQuotes = mockSupplierQuotes.map((quote) => ({
+    ...quote,
+    validUntil: quote.validUntil ? new Date(quote.validUntil) : undefined,
+    createdAt: new Date(quote.createdAt),
+  }));
+
+  for (const quote of supplierQuotes) {
+    await prisma.supplierQuote.upsert({
+      where: { id: quote.id },
+      update: {},
+      create: quote,
+    });
+  }
+
+  console.log(`  ✓ ${supplierQuotes.length} supplier quotes`);
+
+  // Seed bid workflows and tasks.
+  const workflows = mockWorkflows.map((workflow) => ({
+    id: workflow.id,
+    opportunityId: workflow.opportunityId,
+    organizationId: org.id,
+    stage: workflow.stage,
+    assignedTo: workflow.assignedTo ? user.id : undefined,
+    priority: workflow.priority,
+    dueDate: workflow.dueDate ? new Date(workflow.dueDate) : undefined,
+    notes: workflow.notes,
+    createdAt: new Date(workflow.createdAt),
+    updatedAt: new Date(workflow.updatedAt),
+  }));
 
   for (const wf of workflows) {
     await prisma.bidWorkflow.upsert({
@@ -266,6 +156,23 @@ async function main() {
   }
 
   console.log(`  ✓ ${workflows.length} bid workflows`);
+
+  const workflowTasks = mockWorkflowTasks.map((task) => ({
+    ...task,
+    assignedTo: task.assignedTo ? user.id : undefined,
+    dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+    createdAt: new Date(task.createdAt),
+  }));
+
+  for (const task of workflowTasks) {
+    await prisma.workflowTask.upsert({
+      where: { id: task.id },
+      update: {},
+      create: task,
+    });
+  }
+
+  console.log(`  ✓ ${workflowTasks.length} workflow tasks`);
 
   console.log("\n✅ Database seeded successfully!");
 }

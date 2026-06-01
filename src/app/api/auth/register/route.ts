@@ -24,7 +24,9 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorName = error instanceof Error ? error.name : "";
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: error.issues },
@@ -32,14 +34,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (error.name === "UsernameExistsException") {
+    if (errorName === "UsernameExistsException") {
       return NextResponse.json(
         { error: "An account with this email already exists" },
         { status: 409 }
       );
     }
 
-    if (error.name === "InvalidPasswordException") {
+    if (errorName === "InvalidPasswordException") {
       return NextResponse.json(
         { error: "Password does not meet requirements. Must be at least 8 characters with uppercase, lowercase, number, and special character." },
         { status: 400 }

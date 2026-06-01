@@ -101,10 +101,11 @@ export async function POST(request: NextRequest) {
       skipped,
       totalAvailable: result.total,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown sync error";
     console.error("Sync error:", error);
     return NextResponse.json(
-      { error: "Sync failed", message: error.message },
+      { error: "Sync failed", message },
       { status: 500 }
     );
   }

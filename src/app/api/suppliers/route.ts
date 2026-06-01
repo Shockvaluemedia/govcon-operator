@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { mockSuppliers } from "@/data/mock-suppliers";
+import type { Prisma } from "@prisma/client";
 
 // GET /api/suppliers - List suppliers for the user's organization
 export async function GET(request: NextRequest) {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     const user = await getCurrentUser();
 
     if (user) {
-      const where: any = { organizationId: user.organizationId };
+      const where: Prisma.SupplierWhereInput = { organizationId: user.organizationId };
 
       if (category) where.productCategory = category;
       if (search) {

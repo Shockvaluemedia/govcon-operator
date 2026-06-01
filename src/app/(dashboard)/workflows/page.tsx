@@ -136,6 +136,11 @@ function StageColumn({
 export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<BidWorkflow[]>(mockWorkflows);
   const [activeWorkflow, setActiveWorkflow] = useState<BidWorkflow | null>(null);
+  const [dueThisWeekCutoff] = useState(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() + 7);
+    return cutoff;
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -222,6 +227,7 @@ export default function WorkflowsPage() {
     workflows.some((wf) => wf.stage === stage.key) ||
     ["discovered", "under_review", "supplier_sourcing", "pricing", "compliance_check", "proposal_prep", "submitted"].includes(stage.key)
   );
+  const dueThisWeekCount = workflows.filter((wf) => wf.dueDate && new Date(wf.dueDate) < dueThisWeekCutoff).length;
 
   return (
     <div className="space-y-6">
@@ -298,7 +304,7 @@ export default function WorkflowsPage() {
             </div>
             <div className="text-center p-3 rounded-lg bg-gray-50">
               <p className="text-2xl font-bold text-blue-600">
-                {workflows.filter((wf) => wf.dueDate && new Date(wf.dueDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)).length}
+                {dueThisWeekCount}
               </p>
               <p className="text-xs text-gray-500">Due This Week</p>
             </div>

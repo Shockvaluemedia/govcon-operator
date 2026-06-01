@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DocumentType } from "@/types";
 
 interface DocumentRecord {
   id: string;
@@ -48,12 +47,7 @@ export default function DocumentsPage() {
   const [selectedType, setSelectedType] = useState<string>("other");
   const [dragOver, setDragOver] = useState(false);
 
-  // Fetch documents
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
-
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       const res = await fetch("/api/documents");
       const data = await res.json();
@@ -63,10 +57,15 @@ export default function DocumentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Fetch documents
+  useEffect(() => {
+    void Promise.resolve().then(fetchDocuments);
+  }, [fetchDocuments]);
 
   // Handle file upload
-  const handleUpload = async (files: FileList | null) => {
+  const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setUploading(true);
@@ -114,7 +113,7 @@ export default function DocumentsPage() {
     }
 
     setUploading(false);
-  };
+  }, [selectedType]);
 
   // Handle download
   const handleDownload = async (doc: DocumentRecord) => {
@@ -160,7 +159,7 @@ export default function DocumentsPage() {
     e.preventDefault();
     setDragOver(false);
     handleUpload(e.dataTransfer.files);
-  }, [selectedType]);
+  }, [handleUpload]);
 
   // Filter documents
   const filteredDocs = documents.filter((doc) => {

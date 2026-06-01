@@ -38,8 +38,10 @@ export async function POST() {
     });
 
     return response;
-  } catch (error: any) {
-    if (error.name === "NotAuthorizedException") {
+  } catch (error: unknown) {
+    const errorName = error instanceof Error ? error.name : "";
+
+    if (errorName === "NotAuthorizedException") {
       const response = NextResponse.json(
         { error: "Session expired. Please sign in again." },
         { status: 401 }

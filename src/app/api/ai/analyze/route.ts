@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeBidRisk, summarizeOpportunity } from "@/services/ai-service";
+import { analyzeBidRisk } from "@/services/ai-service";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { mockOpportunities } from "@/data/mock-opportunities";
+import type { Opportunity } from "@/types";
 
 // POST /api/ai/analyze - Run AI analysis on an opportunity
 export async function POST(request: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    let opportunity;
+    let opportunity: Opportunity | undefined;
 
     if (opportunityId) {
       // Try database first
@@ -36,8 +37,8 @@ export async function POST(request: NextRequest) {
             setAsideType: dbOpp.setAsideType,
             dueDate: dbOpp.dueDate.toISOString(),
             estimatedValue: Number(dbOpp.estimatedValue),
-            source: dbOpp.source as any,
-            status: dbOpp.status as any,
+            source: dbOpp.source as Opportunity["source"],
+            status: dbOpp.status as Opportunity["status"],
             matchScore: dbOpp.matchScore || 50,
             riskScore: dbOpp.riskScore || 50,
             description: dbOpp.description || "",

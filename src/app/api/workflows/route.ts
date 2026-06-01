@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { mockWorkflows } from "@/data/mock-workflows";
+import type { Prisma } from "@prisma/client";
 
 // GET /api/workflows - List bid workflows
 export async function GET(request: NextRequest) {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     const user = await getCurrentUser();
 
     if (user) {
-      const where: any = { organizationId: user.organizationId };
+      const where: Prisma.BidWorkflowWhereInput = { organizationId: user.organizationId };
       if (stage) where.stage = stage;
       if (priority) where.priority = priority;
 

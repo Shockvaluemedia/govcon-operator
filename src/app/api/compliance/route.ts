@@ -59,13 +59,6 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
-    // Calculate new readiness score
-    const fields = [
-      "ueiRegistered", "samRegistered", "cageCode", "naicsCodes",
-      "pscCodes", "businessBankAccount", "insurance", "capabilityStatement",
-      "pastPerformance",
-    ];
-
     const requiredFields = ["ueiRegistered", "samRegistered", "cageCode", "naicsCodes", "pscCodes", "businessBankAccount", "insurance", "capabilityStatement"];
     const recommendedFields = ["pastPerformance"];
 
@@ -113,7 +106,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-function getCompletionStatus(itemId: string, profile: any): boolean {
+function getCompletionStatus(itemId: string, profile: Record<string, unknown>): boolean {
   const fieldMap: Record<string, string> = {
     uei: "ueiRegistered",
     sam: "samRegistered",
@@ -128,7 +121,7 @@ function getCompletionStatus(itemId: string, profile: any): boolean {
 
   const field = fieldMap[itemId];
   if (field && profile[field] !== undefined) {
-    return profile[field];
+    return Boolean(profile[field]);
   }
   return false;
 }

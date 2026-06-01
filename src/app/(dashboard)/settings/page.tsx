@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { User, Building, Bell, Shield, Plug, Palette } from "lucide-react";
+import { User, Building, Bell, Shield, Plug } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

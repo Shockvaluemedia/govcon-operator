@@ -72,7 +72,7 @@ export function useAuthProvider(): AuthContextType {
   }, []);
 
   useEffect(() => {
-    refreshUser();
+    void Promise.resolve().then(refreshUser);
   }, [refreshUser]);
 
   const login = async (email: string, password: string) => {

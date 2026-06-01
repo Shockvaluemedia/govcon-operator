@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: "If an account exists with this email, a reset code has been sent.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
@@ -47,7 +47,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       message: "Password reset successful. You can now sign in with your new password.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorName = error instanceof Error ? error.name : "";
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid input", details: error.issues },
@@ -55,14 +57,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    if (error.name === "CodeMismatchException") {
+    if (errorName === "CodeMismatchException") {
       return NextResponse.json(
         { error: "Invalid reset code" },
         { status: 400 }
       );
     }
 
-    if (error.name === "ExpiredCodeException") {
+    if (errorName === "ExpiredCodeException") {
       return NextResponse.json(
         { error: "Reset code has expired. Please request a new one." },
         { status: 400 }

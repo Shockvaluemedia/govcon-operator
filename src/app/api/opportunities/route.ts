@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { mockOpportunities } from "@/data/mock-opportunities";
 import { scoreOpportunities, buildOrganizationProfile } from "@/services/matching-engine";
+import type { Prisma } from "@prisma/client";
 
 // GET /api/opportunities - List opportunities with filters
 export async function GET(request: NextRequest) {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Try database first
-    const where: any = {};
+    const where: Prisma.OpportunityWhereInput = {};
 
     if (keyword) {
       where.OR = [
@@ -77,7 +78,10 @@ export async function GET(request: NextRequest) {
           prisma.complianceProfile.findUnique({ where: { organizationId: user.organizationId } }),
         ]);
         if (org) {
-          const profile = buildOrganizationProfile(org, compliance as any);
+          const profile = buildOrganizationProfile(
+            org,
+            compliance ? { ...compliance, lastUpdated: compliance.lastUpdated.toISOString() } : null
+          );
           results = scoreOpportunities(results, profile);
         }
       }
