@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
 import { mockComplianceProfile, complianceChecklist } from "@/data/mock-compliance";
 
 // GET /api/compliance - Get compliance profile
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const databaseRequired = requiresDatabase(request);
+
   try {
     const user = await getCurrentUser();
 
@@ -25,8 +28,15 @@ export async function GET() {
               completed: getCompletionStatus(item.id, profile),
             })),
           },
+          meta: databaseMeta(),
         });
       }
+
+      if (databaseRequired) {
+        return NextResponse.json({ data: null, meta: databaseMeta() }, { status: 404 });
+      }
+    } else if (databaseRequired) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Fallback to mock
@@ -38,6 +48,14 @@ export async function GET() {
       meta: { source: "mock" },
     });
   } catch (error) {
+    if (databaseRequired) {
+      console.error("Database required for compliance but unavailable:", error);
+      return NextResponse.json(
+        { error: "Database unavailable", meta: { source: "database" } },
+        { status: 503 }
+      );
+    }
+
     console.warn("Compliance fetch error:", error);
     return NextResponse.json({
       data: {

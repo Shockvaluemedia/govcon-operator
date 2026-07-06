@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
 import { mockOpportunities } from "@/data/mock-opportunities";
 import { scoreOpportunities, buildOrganizationProfile } from "@/services/matching-engine";
 import type { Prisma } from "@prisma/client";
@@ -8,6 +9,7 @@ import type { Prisma } from "@prisma/client";
 // GET /api/opportunities - List opportunities with filters
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
+  const databaseRequired = requiresDatabase(request);
   const keyword = searchParams.get("keyword");
   const naicsCode = searchParams.get("naics");
   const agency = searchParams.get("agency");
@@ -48,7 +50,14 @@ export async function GET(request: NextRequest) {
     if (total > 0) {
       return NextResponse.json({
         data: opportunities,
-        meta: { total, limit, offset },
+        meta: { ...databaseMeta(total), limit, offset },
+      });
+    }
+
+    if (databaseRequired) {
+      return NextResponse.json({
+        data: [],
+        meta: { ...databaseMeta(0), limit, offset },
       });
     }
 
@@ -97,6 +106,14 @@ export async function GET(request: NextRequest) {
       meta: { total: mockTotal, limit, offset, source: "mock" },
     });
   } catch (error) {
+    if (databaseRequired) {
+      console.error("Database required for opportunities but unavailable:", error);
+      return NextResponse.json(
+        { error: "Database unavailable", meta: { source: "database" } },
+        { status: 503 }
+      );
+    }
+
     // If database connection fails, use mock data
     console.warn("Database unavailable, using mock data:", error);
 

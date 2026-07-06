@@ -22,11 +22,72 @@ const cognitoClient = new CognitoIdentityProviderClient({
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || "";
 const CLIENT_ID = process.env.COGNITO_CLIENT_ID || "";
 const COGNITO_DOMAIN = `https://cognito-idp.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com/${USER_POOL_ID}`;
+const DEMO_TOKEN_PREFIX = "demo-access:";
+const DEMO_ID_TOKEN_PREFIX = "demo-id:";
+const DEMO_REFRESH_PREFIX = "demo-refresh:";
 
 // JWKS for token verification
 const JWKS = createRemoteJWKSet(
   new URL(`${COGNITO_DOMAIN}/.well-known/jwks.json`)
 );
+
+function hasConfiguredCognito(): boolean {
+  return Boolean(
+    USER_POOL_ID &&
+      CLIENT_ID &&
+      !USER_POOL_ID.includes("XXXXXXXXX") &&
+      !CLIENT_ID.includes("your-")
+  );
+}
+
+export function isDemoAuthEnabled(): boolean {
+  if (process.env.GOVCON_DEMO_AUTH === "true") return true;
+  if (process.env.GOVCON_DEMO_AUTH === "false") return false;
+  return process.env.NODE_ENV !== "production" && !hasConfiguredCognito();
+}
+
+function createDemoTokens(email: string): AuthTokens {
+  const encodedEmail = encodeURIComponent(email.toLowerCase());
+
+  return {
+    accessToken: `${DEMO_TOKEN_PREFIX}${encodedEmail}`,
+    idToken: `${DEMO_ID_TOKEN_PREFIX}${encodedEmail}`,
+    refreshToken: `${DEMO_REFRESH_PREFIX}${encodedEmail}`,
+    expiresIn: 60 * 60 * 8,
+  };
+}
+
+function emailFromDemoToken(token: string, prefix: string): string | null {
+  if (!token.startsWith(prefix)) return null;
+
+  try {
+    return decodeURIComponent(token.slice(prefix.length));
+  } catch {
+    return null;
+  }
+}
+
+async function authUserFromEmail(email: string): Promise<AuthUser | null> {
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    include: {
+      userRoles: true,
+      organization: true,
+    },
+  });
+
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    cognitoId: user.cognitoId || `demo-cognito:${user.email}`,
+    organizationId: user.organizationId,
+    role: user.userRoles[0]?.role || "viewer",
+  };
+}
 
 // ============================================================
 // Auth Functions
@@ -60,14 +121,60 @@ export async function signUp(params: {
   organizationName: string;
 }): Promise<{ userSub: string }> {
   const { email, password, firstName, lastName, organizationName } = params;
+  const normalizedEmail = email.toLowerCase();
+
+  if (isDemoAuthEnabled()) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingUser) {
+      return { userSub: existingUser.cognitoId || `demo-cognito:${normalizedEmail}` };
+    }
+
+    const organization = await prisma.organization.create({
+      data: {
+        name: organizationName,
+        naicsCodes: [],
+        pscCodes: [],
+      },
+    });
+
+    const user = await prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        firstName,
+        lastName,
+        cognitoId: `demo-cognito:${normalizedEmail}`,
+        organizationId: organization.id,
+        userRoles: {
+          create: {
+            organizationId: organization.id,
+            role: "owner",
+          },
+        },
+      },
+    });
+
+    await prisma.complianceProfile.create({
+      data: {
+        organizationId: organization.id,
+        readinessScore: 0,
+        certifications: [],
+        setAsideEligibility: [],
+      },
+    });
+
+    return { userSub: user.cognitoId! };
+  }
 
   // Register with Cognito
   const command = new SignUpCommand({
     ClientId: CLIENT_ID,
-    Username: email,
+    Username: normalizedEmail,
     Password: password,
     UserAttributes: [
-      { Name: "email", Value: email },
+      { Name: "email", Value: normalizedEmail },
       { Name: "given_name", Value: firstName },
       { Name: "family_name", Value: lastName },
     ],
@@ -87,7 +194,7 @@ export async function signUp(params: {
 
   await prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       firstName,
       lastName,
       cognitoId,
@@ -118,6 +225,10 @@ export async function signUp(params: {
  * Confirm user registration with verification code
  */
 export async function confirmSignUp(email: string, code: string): Promise<void> {
+  if (isDemoAuthEnabled()) {
+    return;
+  }
+
   const command = new ConfirmSignUpCommand({
     ClientId: CLIENT_ID,
     Username: email,
@@ -134,6 +245,19 @@ export async function signIn(
   email: string,
   password: string
 ): Promise<AuthTokens> {
+  if (isDemoAuthEnabled()) {
+    if (!password) {
+      throw new Error("Password is required");
+    }
+
+    const user = await authUserFromEmail(email);
+    if (!user) {
+      throw new Error("Demo user not found. Run npm run db:seed first.");
+    }
+
+    return createDemoTokens(user.email);
+  }
+
   const command = new InitiateAuthCommand({
     AuthFlow: "USER_PASSWORD_AUTH",
     ClientId: CLIENT_ID,
@@ -160,6 +284,20 @@ export async function signIn(
  * Refresh access token using refresh token
  */
 export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
+  if (isDemoAuthEnabled()) {
+    const email = emailFromDemoToken(refreshToken, DEMO_REFRESH_PREFIX);
+    if (!email) {
+      throw new Error("Invalid demo refresh token");
+    }
+
+    const user = await authUserFromEmail(email);
+    if (!user) {
+      throw new Error("Demo user not found");
+    }
+
+    return createDemoTokens(user.email);
+  }
+
   const command = new InitiateAuthCommand({
     AuthFlow: "REFRESH_TOKEN_AUTH",
     ClientId: CLIENT_ID,
@@ -183,6 +321,10 @@ export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
  * Sign out user globally
  */
 export async function signOut(accessToken: string): Promise<void> {
+  if (isDemoAuthEnabled() && accessToken.startsWith(DEMO_TOKEN_PREFIX)) {
+    return;
+  }
+
   const command = new GlobalSignOutCommand({
     AccessToken: accessToken,
   });
@@ -194,6 +336,10 @@ export async function signOut(accessToken: string): Promise<void> {
  * Initiate forgot password flow
  */
 export async function forgotPassword(email: string): Promise<void> {
+  if (isDemoAuthEnabled()) {
+    return;
+  }
+
   const command = new ForgotPasswordCommand({
     ClientId: CLIENT_ID,
     Username: email,
@@ -210,6 +356,10 @@ export async function confirmForgotPassword(
   code: string,
   newPassword: string
 ): Promise<void> {
+  if (isDemoAuthEnabled()) {
+    return;
+  }
+
   const command = new ConfirmForgotPasswordCommand({
     ClientId: CLIENT_ID,
     Username: email,
@@ -225,6 +375,13 @@ export async function confirmForgotPassword(
  */
 export async function verifyToken(token: string): Promise<AuthUser | null> {
   try {
+    if (isDemoAuthEnabled()) {
+      const email = emailFromDemoToken(token, DEMO_TOKEN_PREFIX);
+      if (email) {
+        return authUserFromEmail(email);
+      }
+    }
+
     const { payload } = await jwtVerify(token, JWKS, {
       issuer: COGNITO_DOMAIN,
     });

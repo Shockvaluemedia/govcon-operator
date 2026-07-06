@@ -4,10 +4,10 @@ AI-powered government contracting platform for small businesses. Discover opport
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS v4, shadcn/ui
+- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS v4, shadcn/ui
 - **Backend**: Next.js API Routes (serverless-ready)
 - **Database**: PostgreSQL (Prisma ORM, AWS RDS-ready)
-- **Auth**: AWS Cognito (mock in development)
+- **Auth**: Seeded demo auth in development; AWS Cognito for production
 - **Storage**: AWS S3 (mock in development)
 - **AI**: OpenAI / AWS Bedrock abstraction layer (mock in development)
 - **Integrations**: SAM.gov, DLA, FPDS, USAspending adapters
@@ -21,11 +21,19 @@ npm install
 # Set up environment variables
 cp .env.example .env.local
 
+# Start local Postgres, push schema, and seed demo tenant data
+docker compose up -d
+npm run db:push
+npm run db:seed
+
 # Run development server
 npm run dev
 
 # Build for production
 npm run build
+
+# Run the authenticated database-backed smoke against a running app
+SMOKE_BASE_URL=http://127.0.0.1:3000 npm run demo:smoke
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to see the landing page.
@@ -61,28 +69,41 @@ prisma/
 └── schema.prisma          # Database schema (PostgreSQL)
 ```
 
+## Readiness
+
+The app supports a seeded local pilot mode. Set `GOVCON_DEMO_AUTH=true`, run the database setup commands above, then sign in as `demo@govcon-operator.com` with any non-empty password.
+
+For production, set `GOVCON_DEMO_AUTH=false` and provide real Cognito, PostgreSQL, S3, AI, and SAM.gov configuration.
+
+The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` runs lint, prepares a seeded PostgreSQL database, builds the app, starts Next.js, and executes the authenticated demo smoke.
+
+Known MVP gaps:
+- Visual polish still needs a full `DESIGN.md` token pass across the dashboard and auth surfaces.
+- Production Cognito, S3, AI, and SAM.gov modes require real environment configuration.
+- Dashboard headline metrics are database-backed; some secondary dashboard panels still use seeded/demo content.
+
 ## Features
 
 | Feature | Status |
 |---------|--------|
-| Landing Page | ✅ Complete |
-| Auth Pages | ✅ Complete |
-| Main Dashboard | ✅ Complete |
-| Opportunity Discovery | ✅ Complete |
-| Opportunity Detail | ✅ Complete |
-| AI Bid Analyzer | ✅ Complete |
-| Supplier Sourcing | ✅ Complete |
-| Margin Calculator | ✅ Complete |
-| Compliance Readiness | ✅ Complete |
-| Bid Workflow Board | ✅ Complete |
-| Document Center | ✅ Complete |
-| AI Assistant Chat | ✅ Complete |
-| Admin Dashboard | ✅ Complete |
-| Settings | ✅ Complete |
-| API Routes | ✅ Complete |
-| Database Schema | ✅ Complete |
-| AI Service Abstraction | ✅ Complete |
-| Integration Adapters | ✅ Complete |
+| Landing Page | Demo-ready |
+| Auth Pages | Local demo login/register wired to API; Cognito path available for production |
+| Main Dashboard | Database-backed headline metrics; secondary panels still demo content |
+| Opportunity Discovery | Database-backed catalog and filters; live SAM.gov sync requires configuration |
+| Opportunity Detail | Demo-ready |
+| AI Bid Analyzer | Provider abstraction with mock default; OpenAI/Bedrock require keys |
+| Supplier Sourcing | Database-backed list/create flow with seeded quotes |
+| Margin Calculator | Demo-ready calculator UI |
+| Compliance Readiness | Demo-ready profile and checklist |
+| Bid Workflow Board | Database-backed board with stage updates |
+| Document Center | Demo UI and S3 adapter; production storage requires configuration |
+| AI Assistant Chat | Mock/default mode; live LLM requires provider configuration |
+| Admin Dashboard | Role-gated API and demo-ready UI |
+| Settings | Demo-ready |
+| API Routes | Demo-ready; production hardening in progress |
+| Database Schema | ✅ Prisma schema + seeded local pilot data |
+| AI Service Abstraction | Mock/OpenAI/Bedrock provider layer |
+| Integration Adapters | Adapter scaffolding; live keys required |
 
 ## User Roles
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   TrendingUp,
   FileSearch,
@@ -15,41 +15,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/utils";
+import type { DashboardMetrics } from "@/types";
 
-const metrics = [
-  {
-    title: "Saved Opportunities",
-    value: "12",
-    change: "+3 this week",
-    icon: FileSearch,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-  },
-  {
-    title: "Active Bids",
-    value: "5",
-    change: "2 due this week",
-    icon: TrendingUp,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-  },
-  {
-    title: "Compliance Score",
-    value: "72%",
-    change: "3 items remaining",
-    icon: ShieldCheck,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-  },
-  {
-    title: "Pipeline Value",
-    value: formatCurrency(1236000),
-    change: "+$195K this month",
-    icon: DollarSign,
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50",
-  },
-];
+const defaultMetrics: DashboardMetrics = {
+  totalSavedOpportunities: 0,
+  activeBids: 0,
+  complianceScore: 0,
+  estimatedRevenue: 0,
+  highRiskOpportunities: 0,
+  tasksDue: 0,
+  pendingQuotes: 0,
+  recommendedActions: ["Search for opportunities matching your NAICS codes"],
+};
 
 const highRiskItems = [
   { title: "IT Hardware - VA Medical Centers", risk: "High", reason: "SDVOSB cert needed", dueIn: "25 days" },
@@ -64,14 +41,67 @@ const tasksDue = [
   { title: "Upload capability statement", due: "Jun 12", priority: "medium" },
 ];
 
-const recommendedActions = [
-  "Complete your Capability Statement to increase compliance score to 80%",
-  "Request quotes for SPE7LX-24-R-0142 — deadline in 18 days",
-  "Review 3 new opportunities matching your NAICS codes",
-  "Update SAM.gov registration (renewal due in 45 days)",
-];
-
 export default function DashboardPage() {
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics>(defaultMetrics);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboardMetrics() {
+      try {
+        const response = await fetch("/api/dashboard");
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!cancelled && payload.data) {
+          setDashboardMetrics(payload.data);
+        }
+      } catch {
+        // Keep the empty state if the dashboard metrics endpoint is unavailable.
+      }
+    }
+
+    void loadDashboardMetrics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const metrics = [
+    {
+      title: "Saved Opportunities",
+      value: String(dashboardMetrics.totalSavedOpportunities),
+      change: "Saved to pipeline",
+      icon: FileSearch,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "Active Bids",
+      value: String(dashboardMetrics.activeBids),
+      change: `${dashboardMetrics.tasksDue} tasks due this week`,
+      icon: TrendingUp,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      title: "Compliance Score",
+      value: `${dashboardMetrics.complianceScore}%`,
+      change: dashboardMetrics.complianceScore >= 80 ? "Ready for most bids" : "Readiness gaps remain",
+      icon: ShieldCheck,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+    {
+      title: "Pipeline Value",
+      value: formatCurrency(dashboardMetrics.estimatedRevenue),
+      change: `${dashboardMetrics.highRiskOpportunities} high-risk opportunities`,
+      icon: DollarSign,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -204,7 +234,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recommendedActions.map((action, i) => (
+              {dashboardMetrics.recommendedActions.map((action, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-700">
                     {i + 1}
@@ -226,9 +256,9 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Overall Readiness Score</span>
-              <span className="text-sm font-bold text-blue-600">72 / 100</span>
+              <span className="text-sm font-bold text-blue-600">{dashboardMetrics.complianceScore} / 100</span>
             </div>
-            <Progress value={72} className="h-3" />
+            <Progress value={dashboardMetrics.complianceScore} className="h-3" />
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
               <div className="text-center p-3 rounded-lg bg-green-50">
                 <p className="text-lg font-bold text-green-700">7</p>

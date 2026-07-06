@@ -8,12 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "demo:smoke": "node scripts/demo-smoke.mjs",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
-    "db:seed": "npx tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset"
+    "db:generate": "dotenv -e .env.local -- prisma generate",
+    "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
+    "db:push": "dotenv -e .env.local -- prisma db push",
+    "db:seed": "dotenv -e .env.local -- npx tsx prisma/seed.ts",
+    "db:studio": "dotenv -e .env.local -- prisma studio",
+    "db:reset": "dotenv -e .env.local -- prisma migrate reset"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1055.0",
@@ -42,8 +42,7 @@
     "date-fns": "^4.3.0",
     "jose": "^6.2.3",
     "lucide-react": "^1.17.0",
-    "next": "16.2.6",
-    "next-auth": "^4.24.14",
+    "next": "^16.2.10",
     "openai": "^6.39.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -53,14 +52,20 @@
     "uuid": "^14.0.0",
     "zod": "^4.4.3"
   },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.16"
+    }
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.2.10",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -11,15 +11,14 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Calendar, DollarSign, GripVertical } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, DollarSign, GripVertical, ListChecks } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockWorkflows } from "@/data/mock-workflows";
+import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { BidWorkflow, WorkflowStage } from "@/types";
+import type { BidWorkflow, Opportunity, WorkflowStage, WorkflowTask } from "@/types";
 
 const stages: { key: WorkflowStage; label: string; color: string }[] = [
   { key: "discovered", label: "Discovered", color: "bg-gray-100" },
@@ -35,12 +34,73 @@ const stages: { key: WorkflowStage; label: string; color: string }[] = [
   { key: "completed", label: "Completed", color: "bg-emerald-50" },
 ];
 
-// Sortable workflow card
-function WorkflowCard({ workflow, isDragging }: { workflow: BidWorkflow; isDragging?: boolean }) {
+const defaultStageKeys: WorkflowStage[] = [
+  "discovered",
+  "under_review",
+  "supplier_sourcing",
+  "pricing",
+  "compliance_check",
+  "proposal_prep",
+  "submitted",
+];
+
+type ApiOpportunity = Omit<Opportunity, "estimatedValue"> & {
+  estimatedValue: number | string;
+};
+
+type ApiWorkflow = Omit<BidWorkflow, "opportunity" | "tasks"> & {
+  opportunity: ApiOpportunity;
+  tasks?: WorkflowTask[];
+};
+
+interface WorkflowsResponse {
+  data?: ApiWorkflow[] | ApiWorkflow;
+  error?: string;
+  meta?: {
+    source?: string;
+    total?: number;
+  };
+}
+
+function normalizeWorkflow(workflow: ApiWorkflow): BidWorkflow {
+  return {
+    ...workflow,
+    opportunity: {
+      ...workflow.opportunity,
+      estimatedValue: Number(workflow.opportunity.estimatedValue || 0),
+    },
+    tasks: workflow.tasks || [],
+  };
+}
+
+function stageLabel(stageKey: WorkflowStage) {
+  return stages.find((stage) => stage.key === stageKey)?.label || stageKey;
+}
+
+function adjacentStage(stageKey: WorkflowStage, direction: -1 | 1) {
+  const currentIndex = stages.findIndex((stage) => stage.key === stageKey);
+  return stages[currentIndex + direction]?.key || null;
+}
+
+function WorkflowCard({
+  workflow,
+  isDragging,
+  updating,
+  onMove,
+}: {
+  workflow: BidWorkflow;
+  isDragging?: boolean;
+  updating?: boolean;
+  onMove: (workflow: BidWorkflow, stage: WorkflowStage) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: workflow.id,
     data: { workflow },
   });
+  const tasks = workflow.tasks || [];
+  const completedTaskCount = tasks.filter((task) => task.status === "completed").length;
+  const previousStage = adjacentStage(workflow.stage, -1);
+  const nextStage = adjacentStage(workflow.stage, 1);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -50,22 +110,28 @@ function WorkflowCard({ workflow, isDragging }: { workflow: BidWorkflow; isDragg
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <Card className="cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow">
+      <Card className="cursor-grab transition-shadow hover:shadow-md active:cursor-grabbing">
         <CardContent className="p-3">
           <div className="space-y-2">
             <div className="flex items-start gap-2">
-              <button {...listeners} className="mt-0.5 text-gray-400 hover:text-gray-600" aria-label="Drag to reorder">
+              <button
+                {...listeners}
+                aria-label="Drag to reorder"
+                className="mt-0.5 text-gray-400 hover:text-gray-600"
+                type="button"
+              >
                 <GripVertical className="h-4 w-4" />
               </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 line-clamp-2">
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-2 text-sm font-medium text-gray-900">
                   {workflow.opportunity.title}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="mt-0.5 text-xs text-gray-500">
                   {workflow.opportunity.agency}
                 </p>
               </div>
             </div>
+
             <div className="flex items-center justify-between pl-6">
               <div className="flex items-center gap-1 text-xs text-gray-500">
                 <DollarSign className="h-3 w-3" />
@@ -82,12 +148,44 @@ function WorkflowCard({ workflow, isDragging }: { workflow: BidWorkflow; isDragg
                 {workflow.priority}
               </Badge>
             </div>
+
             {workflow.dueDate && (
-              <div className="flex items-center gap-1 text-xs text-gray-500 pl-6">
+              <div className="flex items-center gap-1 pl-6 text-xs text-gray-500">
                 <Calendar className="h-3 w-3" />
                 Due: {formatDate(workflow.dueDate)}
               </div>
             )}
+
+            <div className="flex items-center gap-1 pl-6 text-xs text-gray-500">
+              <ListChecks className="h-3 w-3" />
+              {tasks.length > 0 ? `${completedTaskCount}/${tasks.length} tasks complete` : "No tasks yet"}
+            </div>
+
+            <div className="flex items-center gap-2 pl-6 pt-1">
+              <Button
+                aria-label={`Move ${workflow.opportunity.title} to ${previousStage ? stageLabel(previousStage) : "previous stage"}`}
+                className="h-7 px-2"
+                disabled={!previousStage || updating}
+                onClick={() => previousStage && onMove(workflow, previousStage)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              <Button
+                aria-label={`Move ${workflow.opportunity.title} to ${nextStage ? stageLabel(nextStage) : "next stage"}`}
+                className="h-7 flex-1 gap-1 px-2"
+                disabled={!nextStage || updating}
+                onClick={() => nextStage && onMove(workflow, nextStage)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Next
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -95,18 +193,21 @@ function WorkflowCard({ workflow, isDragging }: { workflow: BidWorkflow; isDragg
   );
 }
 
-// Droppable column
 function StageColumn({
   stage,
   workflows,
+  updatingWorkflowId,
+  onMove,
 }: {
   stage: { key: WorkflowStage; label: string; color: string };
   workflows: BidWorkflow[];
+  updatingWorkflowId: string | null;
+  onMove: (workflow: BidWorkflow, stage: WorkflowStage) => void;
 }) {
   return (
     <div className="w-72 flex-shrink-0">
-      <div className={`rounded-lg ${stage.color} p-3 min-h-[200px]`}>
-        <div className="flex items-center justify-between mb-3">
+      <div className={`min-h-[200px] rounded-lg ${stage.color} p-3`}>
+        <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700">{stage.label}</h3>
           <Badge variant="secondary" className="text-xs">
             {workflows.length}
@@ -117,12 +218,17 @@ function StageColumn({
           items={workflows.map((wf) => wf.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-3 min-h-[100px]">
+          <div className="min-h-[100px] space-y-3">
             {workflows.map((workflow) => (
-              <WorkflowCard key={workflow.id} workflow={workflow} />
+              <WorkflowCard
+                key={workflow.id}
+                workflow={workflow}
+                updating={updatingWorkflowId === workflow.id}
+                onMove={onMove}
+              />
             ))}
             {workflows.length === 0 && (
-              <div className="text-center py-8 text-xs text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+              <div className="rounded-lg border-2 border-dashed border-gray-200 py-8 text-center text-xs text-gray-400">
                 Drop here
               </div>
             )}
@@ -134,8 +240,13 @@ function StageColumn({
 }
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState<BidWorkflow[]>(mockWorkflows);
+  const [workflows, setWorkflows] = useState<BidWorkflow[]>([]);
   const [activeWorkflow, setActiveWorkflow] = useState<BidWorkflow | null>(null);
+  const [source, setSource] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updatingWorkflowId, setUpdatingWorkflowId] = useState<string | null>(null);
   const [dueThisWeekCutoff] = useState(() => {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() + 7);
@@ -148,24 +259,96 @@ export default function WorkflowsPage() {
     })
   );
 
-  // Fetch workflows from API
+  const fetchWorkflows = useCallback(async (signal?: AbortSignal) => {
+    const response = await fetch("/api/workflows", {
+      headers: { "x-govcon-data-mode": "database" },
+      signal,
+    });
+    const payload = (await response.json()) as WorkflowsResponse;
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Failed to load workflows");
+    }
+
+    return payload;
+  }, []);
+
   useEffect(() => {
-    async function fetchWorkflows() {
+    const controller = new AbortController();
+
+    async function loadWorkflowBoard() {
+      setLoading(true);
+      setError(null);
+
       try {
-        const res = await fetch("/api/workflows");
-        const data = await res.json();
-        if (data.data && data.data.length > 0) {
-          setWorkflows(data.data);
+        const payload = await fetchWorkflows(controller.signal);
+        const workflowData = Array.isArray(payload.data) ? payload.data : [];
+
+        setWorkflows(workflowData.map(normalizeWorkflow));
+        setSource(payload.meta?.source || null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setWorkflows([]);
+        setSource(null);
+        setError(err instanceof Error ? err.message : "Failed to load workflows");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
         }
-      } catch {
-        // Keep mock data
       }
     }
-    fetchWorkflows();
+
+    void loadWorkflowBoard();
+
+    return () => controller.abort();
+  }, [fetchWorkflows]);
+
+  const updateWorkflowStage = useCallback(async (workflow: BidWorkflow, targetStage: WorkflowStage) => {
+    if (workflow.stage === targetStage) return;
+
+    setUpdateError(null);
+    setUpdatingWorkflowId(workflow.id);
+
+    setWorkflows((prev) =>
+      prev.map((wf) =>
+        wf.id === workflow.id ? { ...wf, stage: targetStage } : wf
+      )
+    );
+
+    try {
+      const response = await fetch("/api/workflows", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-govcon-data-mode": "database",
+        },
+        body: JSON.stringify({ id: workflow.id, stage: targetStage }),
+      });
+      const payload = (await response.json()) as WorkflowsResponse;
+
+      if (!response.ok || Array.isArray(payload.data) || !payload.data) {
+        throw new Error(payload.error || "Failed to update workflow stage");
+      }
+
+      setWorkflows((prev) =>
+        prev.map((wf) =>
+          wf.id === workflow.id ? normalizeWorkflow(payload.data as ApiWorkflow) : wf
+        )
+      );
+    } catch (err) {
+      setWorkflows((prev) =>
+        prev.map((wf) =>
+          wf.id === workflow.id ? { ...wf, stage: workflow.stage } : wf
+        )
+      );
+      setUpdateError(err instanceof Error ? err.message : "Failed to update workflow stage");
+    } finally {
+      setUpdatingWorkflowId(null);
+    }
   }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
-    const wf = workflows.find((w) => w.id === event.active.id);
+    const wf = workflows.find((workflow) => workflow.id === event.active.id);
     setActiveWorkflow(wf || null);
   };
 
@@ -175,138 +358,148 @@ export default function WorkflowsPage() {
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+    const activeWorkflowItem = workflows.find((workflow) => workflow.id === active.id);
+    if (!activeWorkflowItem) return;
 
-    // Determine target stage
-    let targetStage: WorkflowStage | null = null;
+    const stageMatch = stages.find((stage) => stage.key === over.id);
+    const overWorkflow = workflows.find((workflow) => workflow.id === over.id);
+    const targetStage = stageMatch?.key || overWorkflow?.stage || null;
 
-    // Check if dropped on a stage column
-    const stageMatch = stages.find((s) => s.key === overId);
-    if (stageMatch) {
-      targetStage = stageMatch.key;
-    } else {
-      // Dropped on another card - find that card's stage
-      const overWorkflow = workflows.find((w) => w.id === overId);
-      if (overWorkflow) {
-        targetStage = overWorkflow.stage;
-      }
-    }
+    if (!targetStage || activeWorkflowItem.stage === targetStage) return;
 
-    if (!targetStage) return;
-
-    const activeWorkflowItem = workflows.find((w) => w.id === activeId);
-    if (!activeWorkflowItem || activeWorkflowItem.stage === targetStage) return;
-
-    // Update local state immediately (optimistic)
-    setWorkflows((prev) =>
-      prev.map((wf) =>
-        wf.id === activeId ? { ...wf, stage: targetStage! } : wf
-      )
-    );
-
-    // Persist to API
-    try {
-      await fetch("/api/workflows", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: activeId, stage: targetStage }),
-      });
-    } catch (error) {
-      console.error("Failed to update workflow stage:", error);
-      // Revert on failure
-      setWorkflows((prev) =>
-        prev.map((wf) =>
-          wf.id === activeId ? { ...wf, stage: activeWorkflowItem.stage } : wf
-        )
-      );
-    }
+    await updateWorkflowStage(activeWorkflowItem, targetStage);
   };
 
-  const activeStages = stages.filter((stage) =>
-    workflows.some((wf) => wf.stage === stage.key) ||
-    ["discovered", "under_review", "supplier_sourcing", "pricing", "compliance_check", "proposal_prep", "submitted"].includes(stage.key)
+  const activeStages = useMemo(() => {
+    return stages.filter((stage) =>
+      workflows.some((workflow) => workflow.stage === stage.key) ||
+      defaultStageKeys.includes(stage.key)
+    );
+  }, [workflows]);
+
+  const dueThisWeekCount = workflows.filter((workflow) => {
+    return workflow.dueDate && new Date(workflow.dueDate) < dueThisWeekCutoff;
+  }).length;
+  const totalTaskCount = workflows.reduce((sum, workflow) => sum + (workflow.tasks?.length || 0), 0);
+  const completedTaskCount = workflows.reduce(
+    (sum, workflow) => sum + (workflow.tasks || []).filter((task) => task.status === "completed").length,
+    0
   );
-  const dueThisWeekCount = workflows.filter((wf) => wf.dueDate && new Date(wf.dueDate) < dueThisWeekCutoff).length;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Bid Workflow Board</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Drag opportunities between stages to track your bidding pipeline
-        </p>
+    <div className="min-w-0 space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bid Workflow Board</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Track bid stages, task progress, and pipeline value
+          </p>
+        </div>
+        <Badge variant={source === "database" ? "success" : "secondary"} className="w-fit">
+          {loading ? "Loading..." : `${workflows.length} database workflows`}
+        </Badge>
       </div>
 
-      {/* Kanban Board with DnD */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-4 min-w-max">
-            {activeStages.map((stage) => {
-              const stageWorkflows = workflows.filter((wf) => wf.stage === stage.key);
-              return (
-                <StageColumn
-                  key={stage.key}
-                  stage={stage}
-                  workflows={stageWorkflows}
-                />
-              );
-            })}
-          </div>
-        </div>
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-sm font-medium text-red-700">Unable to load workflows</p>
+            <p className="mt-1 text-sm text-red-600">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Drag overlay */}
-        <DragOverlay>
-          {activeWorkflow && (
-            <div className="w-72">
-              <Card className="shadow-lg border-blue-200">
-                <CardContent className="p-3">
-                  <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                    {activeWorkflow.opportunity.title}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatCurrency(activeWorkflow.opportunity.estimatedValue)}
-                  </p>
-                </CardContent>
-              </Card>
+      {updateError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-sm font-medium text-red-700">Unable to update workflow</p>
+            <p className="mt-1 text-sm text-red-600">{updateError}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-sm text-gray-500">Loading workflows...</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && !error && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="overflow-x-auto pb-4">
+            <div className="flex min-w-max gap-4">
+              {activeStages.map((stage) => {
+                const stageWorkflows = workflows.filter((workflow) => workflow.stage === stage.key);
+                return (
+                  <StageColumn
+                    key={stage.key}
+                    stage={stage}
+                    workflows={stageWorkflows}
+                    updatingWorkflowId={updatingWorkflowId}
+                    onMove={updateWorkflowStage}
+                  />
+                );
+              })}
             </div>
-          )}
-        </DragOverlay>
-      </DndContext>
+          </div>
 
-      {/* Summary */}
+          <DragOverlay>
+            {activeWorkflow && (
+              <div className="w-72">
+                <Card className="border-blue-200 shadow-lg">
+                  <CardContent className="p-3">
+                    <p className="line-clamp-2 text-sm font-medium text-gray-900">
+                      {activeWorkflow.opportunity.title}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {formatCurrency(activeWorkflow.opportunity.estimatedValue)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Pipeline Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="text-center p-3 rounded-lg bg-gray-50">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
               <p className="text-2xl font-bold text-gray-900">{workflows.length}</p>
               <p className="text-xs text-gray-500">Total in Pipeline</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-gray-50">
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
               <p className="text-2xl font-bold text-gray-900">
-                {formatCurrency(workflows.reduce((sum, wf) => sum + wf.opportunity.estimatedValue, 0))}
+                {formatCurrency(workflows.reduce((sum, workflow) => sum + workflow.opportunity.estimatedValue, 0))}
               </p>
-              <p className="text-xs text-gray-500">Total Pipeline Value</p>
+              <p className="text-xs text-gray-500">Pipeline Value</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-gray-50">
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
               <p className="text-2xl font-bold text-amber-600">
-                {workflows.filter((wf) => wf.priority === "high" || wf.priority === "critical").length}
+                {workflows.filter((workflow) => workflow.priority === "high" || workflow.priority === "critical").length}
               </p>
               <p className="text-xs text-gray-500">High Priority</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-gray-50">
-              <p className="text-2xl font-bold text-blue-600">
-                {dueThisWeekCount}
-              </p>
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-2xl font-bold text-blue-600">{dueThisWeekCount}</p>
               <p className="text-xs text-gray-500">Due This Week</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-2xl font-bold text-green-600">
+                {completedTaskCount}/{totalTaskCount}
+              </p>
+              <p className="text-xs text-gray-500">Tasks Complete</p>
             </div>
           </div>
         </CardContent>

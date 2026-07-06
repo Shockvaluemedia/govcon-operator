@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
+import { requireRole } from "@/lib/auth";
 
 // GET /api/admin - Get admin dashboard data
 export async function GET() {
-  // In production, this would require admin role verification
+  try {
+    await requireRole(["owner", "admin"]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unauthorized";
+    return NextResponse.json(
+      { error: message },
+      { status: message.startsWith("Forbidden") ? 403 : 401 }
+    );
+  }
 
   const adminData = {
     users: {
