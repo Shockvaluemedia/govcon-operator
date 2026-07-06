@@ -23,16 +23,16 @@ import { BidWorkflow, WorkflowStage } from "@/types";
 
 const stages: { key: WorkflowStage; label: string; color: string }[] = [
   { key: "discovered", label: "Discovered", color: "bg-gray-100" },
-  { key: "under_review", label: "Under Review", color: "bg-blue-50" },
-  { key: "supplier_sourcing", label: "Supplier Sourcing", color: "bg-indigo-50" },
-  { key: "pricing", label: "Pricing", color: "bg-purple-50" },
+  { key: "under_review", label: "Under Review", color: "bg-slate-100" },
+  { key: "supplier_sourcing", label: "Supplier Sourcing", color: "bg-slate-50" },
+  { key: "pricing", label: "Pricing", color: "bg-gray-50" },
   { key: "compliance_check", label: "Compliance Check", color: "bg-amber-50" },
-  { key: "proposal_prep", label: "Proposal Prep", color: "bg-orange-50" },
-  { key: "submitted", label: "Submitted", color: "bg-cyan-50" },
-  { key: "awarded", label: "Awarded", color: "bg-green-50" },
+  { key: "proposal_prep", label: "Proposal Prep", color: "bg-amber-100" },
+  { key: "submitted", label: "Submitted", color: "bg-green-50" },
+  { key: "awarded", label: "Awarded", color: "bg-green-100" },
   { key: "lost", label: "Lost", color: "bg-red-50" },
-  { key: "fulfillment", label: "Fulfillment", color: "bg-teal-50" },
-  { key: "completed", label: "Completed", color: "bg-emerald-50" },
+  { key: "fulfillment", label: "Fulfillment", color: "bg-emerald-50" },
+  { key: "completed", label: "Completed", color: "bg-emerald-100" },
 ];
 
 // Sortable workflow card
@@ -264,7 +264,7 @@ export default function WorkflowsPage() {
         <DragOverlay>
           {activeWorkflow && (
             <div className="w-72">
-              <Card className="shadow-lg border-blue-200">
+              <Card className="shadow-lg border-ring">
                 <CardContent className="p-3">
                   <p className="text-sm font-medium text-gray-900 line-clamp-2">
                     {activeWorkflow.opportunity.title}
@@ -303,7 +303,7 @@ export default function WorkflowsPage() {
               <p className="text-xs text-gray-500">High Priority</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-gray-50">
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-2xl font-bold text-primary">
                 {dueThisWeekCount}
               </p>
               <p className="text-xs text-gray-500">Due This Week</p>

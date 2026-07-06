@@ -138,7 +138,7 @@ export default function OpportunityDetailPage() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <Calendar className="h-5 w-5 text-blue-600 mx-auto" />
+            <Calendar className="h-5 w-5 text-primary mx-auto" />
             <p className="text-lg font-bold text-gray-900 mt-1">{daysUntilDue} days</p>
             <p className="text-xs text-gray-500">Until Due</p>
           </CardContent>
@@ -280,7 +280,7 @@ export default function OpportunityDetailPage() {
               <ul className="space-y-3">
                 {opportunity.requirements.map((req, i) => (
                   <li key={i} className="flex items-start gap-3">
-                    <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                     <span className="text-sm text-gray-700">{req}</span>
                   </li>
                 ))}
@@ -295,7 +295,7 @@ export default function OpportunityDetailPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-blue-600" />
+                    <Brain className="h-4 w-4 text-primary" />
                     AI Bid Analysis
                   </CardTitle>
                 </CardHeader>
@@ -358,7 +358,7 @@ export default function OpportunityDetailPage() {
                     <ol className="space-y-2">
                       {analysis.recommendedNextSteps.map((item, i) => (
                         <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-700">{i + 1}</span>
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium text-primary">{i + 1}</span>
                           {item}
                         </li>
                       ))}

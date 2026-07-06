@@ -47,7 +47,7 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
 
           <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4">
             <div className="flex h-16 shrink-0 items-center gap-2">
-              <Building2 className="h-8 w-8 text-blue-600" />
+              <Building2 className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-lg font-bold text-gray-900">GovCon</h1>
                 <p className="text-xs text-gray-500 -mt-1">Operator</p>
@@ -66,14 +66,14 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
                         className={cn(
                           "group flex gap-x-3 rounded-md p-2 text-sm font-medium leading-6",
                           isActive
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-gray-700 hover:bg-gray-50 hover:text-blue-600"
+                            ? "bg-accent text-accent-foreground"
+                            : "text-gray-700 hover:bg-gray-50 hover:text-primary"
                         )}
                       >
                         <item.icon
                           className={cn(
                             "h-5 w-5 shrink-0",
-                            isActive ? "text-blue-700" : "text-gray-400 group-hover:text-blue-600"
+                            isActive ? "text-primary" : "text-gray-400 group-hover:text-primary"
                           )}
                         />
                         {item.name}

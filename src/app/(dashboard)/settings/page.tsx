@@ -98,7 +98,7 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium text-gray-900">{item.label}</p>
                   <p className="text-xs text-gray-500">{item.description}</p>
                 </div>
-                <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-gray-300 text-primary" />
               </div>
             ))}
           </div>

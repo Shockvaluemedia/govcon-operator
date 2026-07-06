@@ -34,8 +34,8 @@ export default function CompliancePage() {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <ShieldCheck className="h-6 w-6 text-blue-600" />
+              <div className="h-12 w-12 rounded-full bg-accent flex items-center justify-center">
+                <ShieldCheck className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Readiness Score</h2>
@@ -43,7 +43,7 @@ export default function CompliancePage() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-4xl font-bold text-blue-600">{score}</p>
+              <p className="text-4xl font-bold text-primary">{score}</p>
               <p className="text-sm text-gray-500">out of 100</p>
             </div>
           </div>
@@ -57,9 +57,9 @@ export default function CompliancePage() {
               <p className="text-lg font-bold text-amber-700">{totalCount - completedCount}</p>
               <p className="text-xs text-amber-600">Remaining</p>
             </div>
-            <div className="p-2 rounded-lg bg-blue-50">
-              <p className="text-lg font-bold text-blue-700">{totalCount}</p>
-              <p className="text-xs text-blue-600">Total Items</p>
+            <div className="p-2 rounded-lg bg-accent">
+              <p className="text-lg font-bold text-primary">{totalCount}</p>
+              <p className="text-xs text-primary">Total Items</p>
             </div>
           </div>
         </CardContent>
@@ -133,22 +133,22 @@ export default function CompliancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-blue-500" />
+            <AlertCircle className="h-4 w-4 text-primary" />
             Tips to Improve Your Score
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm text-gray-700">
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold">1.</span>
+              <span className="text-primary font-bold">1.</span>
               Create a Capability Statement — this is your company&apos;s resume for government buyers.
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold">2.</span>
+              <span className="text-primary font-bold">2.</span>
               Document any past performance, even commercial work that demonstrates relevant experience.
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold">3.</span>
+              <span className="text-primary font-bold">3.</span>
               Explore SBA certifications (8(a), HUBZone, WOSB) to access set-aside opportunities.
             </li>
           </ul>

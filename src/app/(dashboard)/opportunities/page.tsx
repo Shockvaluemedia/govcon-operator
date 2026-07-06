@@ -135,7 +135,7 @@ export default function OpportunitiesPage() {
                   return (
                     <tr key={opp.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-2">
-                        <Link href={`/opportunities/${opp.id}`} className="hover:text-blue-600">
+                        <Link href={`/opportunities/${opp.id}`} className="hover:text-primary">
                           <p className="font-medium text-gray-900 line-clamp-1">{opp.title}</p>
                           <p className="text-xs text-gray-500">{opp.solicitationNumber}</p>
                         </Link>

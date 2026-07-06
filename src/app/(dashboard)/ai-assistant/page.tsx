@@ -108,19 +108,19 @@ export default function AIAssistantPage() {
               className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {message.role === "assistant" && (
-                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                  <Bot className="h-4 w-4 text-blue-600" />
+                <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0">
+                  <Bot className="h-4 w-4 text-primary" />
                 </div>
               )}
               <div
                 className={`max-w-[80%] rounded-lg px-4 py-3 ${
                   message.role === "user"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-primary text-primary-foreground"
                     : "bg-gray-100 text-gray-800"
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <p className={`text-xs mt-1 ${message.role === "user" ? "text-blue-200" : "text-gray-400"}`}>
+                <p className={`text-xs mt-1 ${message.role === "user" ? "text-primary-foreground/70" : "text-gray-400"}`}>
                   {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
@@ -134,8 +134,8 @@ export default function AIAssistantPage() {
 
           {isTyping && (
             <div className="flex gap-3">
-              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <Bot className="h-4 w-4 text-blue-600" />
+              <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0">
+                <Bot className="h-4 w-4 text-primary" />
               </div>
               <div className="bg-gray-100 rounded-lg px-4 py-3">
                 <div className="flex gap-1">
@@ -162,7 +162,7 @@ export default function AIAssistantPage() {
                 <button
                   key={q}
                   onClick={() => handleSuggestion(q)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-accent hover:border-ring hover:text-accent-foreground transition-colors"
                 >
                   {q}
                 </button>

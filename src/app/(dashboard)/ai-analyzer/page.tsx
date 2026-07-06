@@ -167,7 +167,7 @@ export default function AIAnalyzerPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
                   Compliance Requirements
                 </CardTitle>
               </CardHeader>
@@ -175,7 +175,7 @@ export default function AIAnalyzerPage() {
                 <ul className="space-y-2">
                   {result.complianceRequirements.map((item, i) => (
                     <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary mt-2 shrink-0" />
                       {item}
                     </li>
                   ))}
@@ -205,7 +205,7 @@ export default function AIAnalyzerPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-indigo-500" />
+                  <Truck className="h-4 w-4 text-slate-500" />
                   Supplier Needs
                 </CardTitle>
               </CardHeader>
@@ -213,7 +213,7 @@ export default function AIAnalyzerPage() {
                 <ul className="space-y-2">
                   {result.supplierNeeds.map((item, i) => (
                     <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-slate-400 mt-2 shrink-0" />
                       {item}
                     </li>
                   ))}
@@ -281,7 +281,7 @@ export default function AIAnalyzerPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <HelpCircle className="h-4 w-4 text-purple-500" />
+                  <HelpCircle className="h-4 w-4 text-slate-500" />
                   Questions to Ask Before Bidding
                 </CardTitle>
               </CardHeader>
@@ -289,7 +289,7 @@ export default function AIAnalyzerPage() {
                 <ul className="space-y-2">
                   {result.questionsToAsk.map((item, i) => (
                     <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                      <span className="text-purple-500 font-medium text-xs">{i + 1}.</span>
+                      <span className="text-slate-500 font-medium text-xs">{i + 1}.</span>
                       {item}
                     </li>
                   ))}
@@ -300,7 +300,7 @@ export default function AIAnalyzerPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
                   Recommended Next Steps
                 </CardTitle>
               </CardHeader>
@@ -308,7 +308,7 @@ export default function AIAnalyzerPage() {
                 <ol className="space-y-2">
                   {result.nextSteps.map((item, i) => (
                     <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-700">{i + 1}</span>
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium text-primary">{i + 1}</span>
                       {item}
                     </li>
                   ))}

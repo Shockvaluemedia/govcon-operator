@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 const adminMetrics = [
-  { title: "Total Users", value: "24", icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-  { title: "Organizations", value: "8", icon: Building, color: "text-purple-600", bg: "bg-purple-50" },
-  { title: "AI Analyses Run", value: "156", icon: Brain, color: "text-green-600", bg: "bg-green-50" },
-  { title: "Active Workflows", value: "32", icon: Kanban, color: "text-indigo-600", bg: "bg-indigo-50" },
+  { title: "Total Users", value: "24", icon: Users, color: "text-primary", bg: "bg-accent" },
+  { title: "Organizations", value: "8", icon: Building, color: "text-primary", bg: "bg-accent" },
+  { title: "AI Analyses Run", value: "156", icon: Brain, color: "text-primary", bg: "bg-accent" },
+  { title: "Active Workflows", value: "32", icon: Kanban, color: "text-primary", bg: "bg-accent" },
 ];
 
 const recentActivity = [
@@ -65,7 +65,7 @@ export default function AdminPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="h-4 w-4 text-blue-500" />
+              <Activity className="h-4 w-4 text-primary" />
               Recent Platform Activity
             </CardTitle>
           </CardHeader>
@@ -115,7 +115,7 @@ export default function AdminPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Plug className="h-4 w-4 text-indigo-500" />
+              <Plug className="h-4 w-4 text-slate-500" />
               Integration Status
             </CardTitle>
           </CardHeader>
@@ -164,7 +164,7 @@ export default function AdminPage() {
               </div>
               <div className="border-t pt-3 flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-900">Total API Calls</span>
-                <span className="text-sm font-bold text-blue-600">424</span>
+                <span className="text-sm font-bold text-primary">424</span>
               </div>
             </div>
           </CardContent>

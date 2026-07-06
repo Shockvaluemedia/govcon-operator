@@ -197,7 +197,7 @@ export default function MarginCalculatorPage() {
           {/* Recommendation */}
           <Card className={
             calculations.bidRecommendation === "strong_bid" ? "border-green-200" :
-            calculations.bidRecommendation === "moderate_bid" ? "border-blue-200" :
+            calculations.bidRecommendation === "moderate_bid" ? "border-slate-300" :
             calculations.bidRecommendation === "weak_bid" ? "border-amber-200" :
             "border-red-200"
           }>

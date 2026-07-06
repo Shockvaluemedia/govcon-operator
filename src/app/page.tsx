@@ -68,7 +68,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-2">
-              <Building2 className="h-8 w-8 text-blue-600" />
+              <Building2 className="h-8 w-8 text-primary" />
               <div>
                 <span className="text-xl font-bold text-gray-900">GovCon</span>
                 <span className="text-xl font-light text-gray-500 ml-1">Operator</span>
@@ -92,7 +92,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
               Your AI Operating System for{" "}
-              <span className="text-blue-600">Government Contracting</span>
+              <span className="text-primary">Government Contracting</span>
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600">
               Find opportunities, understand requirements, evaluate bids, source suppliers,
@@ -139,8 +139,8 @@ export default function LandingPage() {
                 key={feature.title}
                 className="relative rounded-xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                  <feature.icon className="h-5 w-5 text-blue-600" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
+                  <feature.icon className="h-5 w-5 text-primary" />
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-gray-900">{feature.title}</h3>
                 <p className="mt-2 text-sm text-gray-600">{feature.description}</p>
@@ -184,10 +184,10 @@ export default function LandingPage() {
                 <div className="rounded-lg bg-white p-4 shadow-sm border border-gray-100">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-900">Compliance Readiness</span>
-                    <span className="text-sm font-bold text-blue-600">72%</span>
+                    <span className="text-sm font-bold text-primary">72%</span>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-gray-200">
-                    <div className="h-2 rounded-full bg-blue-600" style={{ width: "72%" }} />
+                    <div className="h-2 rounded-full bg-primary" style={{ width: "72%" }} />
                   </div>
                 </div>
                 <div className="rounded-lg bg-white p-4 shadow-sm border border-gray-100">
@@ -215,12 +215,12 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-blue-600 py-16">
+      <section className="bg-primary py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white sm:text-4xl">
             Ready to start winning government contracts?
           </h2>
-          <p className="mt-4 text-lg text-blue-100">
+          <p className="mt-4 text-lg text-primary-foreground/80">
             Join small businesses using GovCon Operator to build structured procurement operations.
           </p>
           <div className="mt-8 flex justify-center gap-4">
@@ -238,7 +238,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Building2 className="h-6 w-6 text-blue-600" />
+              <Building2 className="h-6 w-6 text-primary" />
               <span className="text-sm font-semibold text-gray-900">GovCon Operator</span>
             </div>
             <p className="text-sm text-gray-500">

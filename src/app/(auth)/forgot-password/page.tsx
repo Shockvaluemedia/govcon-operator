@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <div className="flex justify-center items-center gap-2">
-            <Building2 className="h-10 w-10 text-blue-600" />
+            <Building2 className="h-10 w-10 text-primary" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">GovCon</h1>
               <p className="text-xs text-gray-500 -mt-1">Operator</p>
@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
               If an account exists with <strong>{email}</strong>, you&apos;ll receive a password
               reset link shortly.
             </p>
-            <Link href="/login" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/login" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
               <ArrowLeft className="h-4 w-4" /> Back to sign in
             </Link>
           </div>
@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
             </Button>
 
             <div className="text-center">
-              <Link href="/login" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-500">
+              <Link href="/login" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
                 <ArrowLeft className="h-4 w-4" /> Back to sign in
               </Link>
             </div>

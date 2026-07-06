@@ -219,12 +219,12 @@ export default function DocumentsPage() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-              dragOver ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-blue-300"
+              dragOver ? "border-ring bg-accent" : "border-gray-200 hover:border-ring"
             }`}
           >
             {uploading ? (
               <div className="flex flex-col items-center">
-                <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+                <Loader2 className="h-10 w-10 text-primary animate-spin" />
                 <p className="mt-3 text-sm text-gray-600">Uploading...</p>
               </div>
             ) : uploadSuccess ? (
@@ -303,11 +303,11 @@ export default function DocumentsPage() {
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                    <div className="h-10 w-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
                       {doc.name.endsWith(".pdf") ? (
                         <FileText className="h-5 w-5 text-red-500" />
                       ) : (
-                        <File className="h-5 w-5 text-blue-500" />
+                        <File className="h-5 w-5 text-primary" />
                       )}
                     </div>
                     <div className="min-w-0">
