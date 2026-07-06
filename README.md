@@ -7,7 +7,7 @@ AI-powered government contracting platform for small businesses. Discover opport
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS v4, shadcn/ui
 - **Backend**: Next.js API Routes (serverless-ready)
 - **Database**: PostgreSQL (Prisma ORM, AWS RDS-ready)
-- **Auth**: AWS Cognito (mock in development)
+- **Auth**: AWS Cognito, with a built-in zero-config demo mode for development
 - **Storage**: AWS S3 (mock in development)
 - **AI**: OpenAI / AWS Bedrock abstraction layer (mock in development)
 - **Integrations**: SAM.gov, DLA, FPDS, USAspending adapters
@@ -29,6 +29,26 @@ npm run build
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to see the landing page.
+
+### Demo login (zero-config)
+
+The app runs without any external services. With no `DATABASE_URL`, no Cognito,
+and no API keys configured, it uses built-in **demo auth**, **mock AI**, and
+**mock data** so you can walk the entire product immediately.
+
+1. Go to [http://localhost:3000/login](http://localhost:3000/login)
+2. The form is pre-filled with a demo account — **any credentials sign you in**
+3. You land on the dashboard with a fully populated demo workspace
+
+To use real auth instead, set `AUTH_PROVIDER=cognito` plus `COGNITO_USER_POOL_ID`
+and `COGNITO_CLIENT_ID` (see `.env.example`). To persist real data, set
+`DATABASE_URL` and run `npm run db:push && npm run db:seed`.
+
+### Verify the demo
+
+```bash
+npm run demo:smoke   # smoke-tests pages, auth gates, and core APIs
+```
 
 ## Project Structure
 

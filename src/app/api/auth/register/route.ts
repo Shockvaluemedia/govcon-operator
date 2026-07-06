@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { signUp } from "@/lib/auth";
+import { signUp, isMockAuth } from "@/lib/auth";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -17,10 +17,17 @@ export async function POST(request: NextRequest) {
 
     const result = await signUp(validated);
 
+    // In demo mode there is no email verification step — the account can sign in
+    // immediately using the shared demo credentials.
+    const needsConfirmation = !isMockAuth();
+
     return NextResponse.json(
       {
-        message: "Registration successful. Please check your email for verification code.",
+        message: needsConfirmation
+          ? "Registration successful. Please check your email for a verification code."
+          : "Demo account ready. Sign in with any credentials to explore the platform.",
         userSub: result.userSub,
+        needsConfirmation,
       },
       { status: 201 }
     );

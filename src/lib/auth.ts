@@ -7,7 +7,7 @@ import {
   ConfirmForgotPasswordCommand,
   GlobalSignOutCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import { jwtVerify, createRemoteJWKSet, SignJWT } from "jose";
 import { cookies } from "next/headers";
 import prisma from "./prisma";
 
@@ -27,6 +27,91 @@ const COGNITO_DOMAIN = `https://cognito-idp.${process.env.AWS_REGION || "us-east
 const JWKS = createRemoteJWKSet(
   new URL(`${COGNITO_DOMAIN}/.well-known/jwks.json`)
 );
+
+// ============================================================
+// Demo / Mock Auth (zero-config: no Cognito or database required)
+// ============================================================
+
+/**
+ * Whether to use the built-in demo auth instead of AWS Cognito.
+ * Defaults to demo mode unless a Cognito user pool + client are configured.
+ * Force either mode explicitly with AUTH_PROVIDER=cognito | mock.
+ */
+export function isMockAuth(): boolean {
+  const provider = process.env.AUTH_PROVIDER;
+  if (provider === "cognito") return false;
+  if (provider === "mock") return true;
+  return !USER_POOL_ID || !CLIENT_ID;
+}
+
+const DEMO_AUTH_SECRET = new TextEncoder().encode(
+  process.env.AUTH_SECRET || "govcon-operator-demo-secret-not-for-production"
+);
+
+const DEMO_TOKEN_TTL_SECONDS = 8 * 60 * 60; // 8 hours
+
+/** In-memory demo identity. Mirrors prisma/seed.ts so DB and no-DB demos line up. */
+export const DEMO_USER: AuthUser = {
+  id: "user-demo-001",
+  email: "demo@govcon-operator.com",
+  firstName: "Jane",
+  lastName: "Doe",
+  cognitoId: "demo-cognito-id",
+  organizationId: "org-demo-001",
+  role: "owner",
+};
+
+/** Demo organization profile served when no database is connected. */
+export const DEMO_ORGANIZATION = {
+  id: "org-demo-001",
+  name: "Acme Government Solutions LLC",
+  uei: "ABC123DEF456",
+  cageCode: "1A2B3",
+  samRegistered: true,
+  naicsCodes: ["424120", "423430", "424690", "423840"],
+  pscCodes: ["7510", "7021", "7930", "4240"],
+};
+
+async function issueDemoToken(email: string): Promise<string> {
+  return new SignJWT({ email })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(DEMO_USER.cognitoId)
+    .setIssuedAt()
+    .setExpirationTime(`${DEMO_TOKEN_TTL_SECONDS}s`)
+    .sign(DEMO_AUTH_SECRET);
+}
+
+async function verifyDemoToken(token: string): Promise<AuthUser | null> {
+  try {
+    await jwtVerify(token, DEMO_AUTH_SECRET);
+  } catch {
+    return null;
+  }
+
+  // Prefer the seeded database record when a DB is available so IDs line up,
+  // but fall back to the in-memory identity so the demo works with no DB.
+  try {
+    const user = await prisma.user.findUnique({
+      where: { cognitoId: DEMO_USER.cognitoId },
+      include: { userRoles: true },
+    });
+    if (user) {
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        cognitoId: user.cognitoId!,
+        organizationId: user.organizationId,
+        role: user.userRoles[0]?.role || "owner",
+      };
+    }
+  } catch {
+    // Database unavailable — fall through to the in-memory demo identity.
+  }
+
+  return DEMO_USER;
+}
 
 // ============================================================
 // Auth Functions
@@ -60,6 +145,11 @@ export async function signUp(params: {
   organizationName: string;
 }): Promise<{ userSub: string }> {
   const { email, password, firstName, lastName, organizationName } = params;
+
+  // Demo mode: registration is a no-op that leads to the shared demo account.
+  if (isMockAuth()) {
+    return { userSub: DEMO_USER.cognitoId };
+  }
 
   // Register with Cognito
   const command = new SignUpCommand({
@@ -118,6 +208,8 @@ export async function signUp(params: {
  * Confirm user registration with verification code
  */
 export async function confirmSignUp(email: string, code: string): Promise<void> {
+  if (isMockAuth()) return;
+
   const command = new ConfirmSignUpCommand({
     ClientId: CLIENT_ID,
     Username: email,
@@ -134,6 +226,17 @@ export async function signIn(
   email: string,
   password: string
 ): Promise<AuthTokens> {
+  // Demo mode: accept any credentials and issue a signed demo token.
+  if (isMockAuth()) {
+    const token = await issueDemoToken(email);
+    return {
+      accessToken: token,
+      idToken: token,
+      refreshToken: token,
+      expiresIn: DEMO_TOKEN_TTL_SECONDS,
+    };
+  }
+
   const command = new InitiateAuthCommand({
     AuthFlow: "USER_PASSWORD_AUTH",
     ClientId: CLIENT_ID,
@@ -160,6 +263,16 @@ export async function signIn(
  * Refresh access token using refresh token
  */
 export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
+  if (isMockAuth()) {
+    const token = await issueDemoToken(DEMO_USER.email);
+    return {
+      accessToken: token,
+      idToken: token,
+      refreshToken: token,
+      expiresIn: DEMO_TOKEN_TTL_SECONDS,
+    };
+  }
+
   const command = new InitiateAuthCommand({
     AuthFlow: "REFRESH_TOKEN_AUTH",
     ClientId: CLIENT_ID,
@@ -183,6 +296,8 @@ export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
  * Sign out user globally
  */
 export async function signOut(accessToken: string): Promise<void> {
+  if (isMockAuth()) return;
+
   const command = new GlobalSignOutCommand({
     AccessToken: accessToken,
   });
@@ -194,6 +309,8 @@ export async function signOut(accessToken: string): Promise<void> {
  * Initiate forgot password flow
  */
 export async function forgotPassword(email: string): Promise<void> {
+  if (isMockAuth()) return;
+
   const command = new ForgotPasswordCommand({
     ClientId: CLIENT_ID,
     Username: email,
@@ -210,6 +327,8 @@ export async function confirmForgotPassword(
   code: string,
   newPassword: string
 ): Promise<void> {
+  if (isMockAuth()) return;
+
   const command = new ConfirmForgotPasswordCommand({
     ClientId: CLIENT_ID,
     Username: email,
@@ -224,6 +343,10 @@ export async function confirmForgotPassword(
  * Verify JWT token and return user data
  */
 export async function verifyToken(token: string): Promise<AuthUser | null> {
+  if (isMockAuth()) {
+    return verifyDemoToken(token);
+  }
+
   try {
     const { payload } = await jwtVerify(token, JWKS, {
       issuer: COGNITO_DOMAIN,
