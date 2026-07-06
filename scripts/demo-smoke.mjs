@@ -103,6 +103,44 @@ async function checkDashboardMetrics() {
   console.log(`ok api /api/dashboard: ${payload.data.activeBids} active bids`);
 }
 
+async function checkSavedSearchSync() {
+  const searchName = `Demo smoke SAM scan ${Date.now()}`;
+  const created = await request("/api/opportunities/searches", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: searchName,
+      keyword: "office supplies",
+      naicsCode: "424120",
+      setAside: "Total Small Business",
+      limit: 10,
+    }),
+  });
+
+  assert(created.data?.id, "Saved search create did not return an id");
+
+  const searches = await request("/api/opportunities/searches");
+  assert(
+    Array.isArray(searches.data) && searches.data.some((search) => search.id === created.data.id),
+    "Saved search list did not include created search"
+  );
+
+  const sync = await request("/api/opportunities/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ searchId: created.data.id }),
+  });
+
+  assert(typeof sync.synced === "number", "SAM sync did not return a synced count");
+  assert(sync.meta?.source === "SAM.gov", "SAM sync did not report SAM.gov source");
+
+  await request(`/api/opportunities/searches?id=${encodeURIComponent(created.data.id)}`, {
+    method: "DELETE",
+  });
+
+  console.log(`ok api saved searches + SAM sync: ${sync.synced} synced`);
+}
+
 async function main() {
   console.log(`GovCon demo smoke: ${baseUrl}`);
 
@@ -119,6 +157,7 @@ async function main() {
   await checkPage("/suppliers", "Supplier Sourcing");
 
   await checkDashboardMetrics();
+  await checkSavedSearchSync();
   const opportunities = await checkCollection("/api/opportunities", "opportunities", 8, "database");
   await checkCollection("/api/suppliers", "suppliers", 5, "database");
   await checkCollection("/api/workflows", "workflows", 5, "database");

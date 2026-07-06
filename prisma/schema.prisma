@@ -25,15 +25,16 @@ model User {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization       Organization        @relation(fields: [organizationId], references: [id])
-  userRoles          UserRole[]
-  savedOpportunities SavedOpportunity[]
-  analyses           OpportunityAnalysis[]
-  documents          Document[]
-  notes              Note[]
-  aiMessages         AIMessage[]
-  auditLogs          AuditLog[]
-  workflowTasks      WorkflowTask[]      @relation("AssignedTasks")
+  organization        Organization          @relation(fields: [organizationId], references: [id])
+  userRoles           UserRole[]
+  savedOpportunities  SavedOpportunity[]
+  opportunitySearches OpportunitySearch[]
+  analyses            OpportunityAnalysis[]
+  documents           Document[]
+  notes               Note[]
+  aiMessages          AIMessage[]
+  auditLogs           AuditLog[]
+  workflowTasks       WorkflowTask[]        @relation("AssignedTasks")
 
   @@map("users")
 }
@@ -49,15 +50,16 @@ model Organization {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  users              User[]
-  userRoles          UserRole[]
-  savedOpportunities SavedOpportunity[]
-  suppliers          Supplier[]
-  complianceProfile  ComplianceProfile?
-  documents          Document[]
-  bidWorkflows       BidWorkflow[]
-  integrations       Integration[]
-  fundingModels      FundingCashflowModel[]
+  users               User[]
+  userRoles           UserRole[]
+  savedOpportunities  SavedOpportunity[]
+  opportunitySearches OpportunitySearch[]
+  suppliers           Supplier[]
+  complianceProfile   ComplianceProfile?
+  documents           Document[]
+  bidWorkflows        BidWorkflow[]
+  integrations        Integration[]
+  fundingModels       FundingCashflowModel[]
 
   @@map("organizations")
 }
@@ -89,32 +91,32 @@ enum Role {
 // ============================================================
 
 model Opportunity {
-  id                   String   @id @default(uuid())
+  id                   String    @id @default(uuid())
   title                String
   agency               String
-  solicitationNumber   String   @map("solicitation_number")
-  naicsCode            String   @map("naics_code")
-  pscCode              String   @map("psc_code")
-  setAsideType         String   @map("set_aside_type")
-  dueDate              DateTime @map("due_date")
-  estimatedValue       Decimal  @map("estimated_value")
+  solicitationNumber   String    @map("solicitation_number")
+  naicsCode            String    @map("naics_code")
+  pscCode              String    @map("psc_code")
+  setAsideType         String    @map("set_aside_type")
+  dueDate              DateTime  @map("due_date")
+  estimatedValue       Decimal   @map("estimated_value")
   source               String
-  status               String   @default("active")
-  matchScore           Int?     @map("match_score")
-  riskScore            Int?     @map("risk_score")
+  status               String    @default("active")
+  matchScore           Int?      @map("match_score")
+  riskScore            Int?      @map("risk_score")
   description          String?
   requirements         String[]
-  deliveryRequirements String?  @map("delivery_requirements")
-  placeOfPerformance   String?  @map("place_of_performance")
-  pointOfContact       String?  @map("point_of_contact")
-  postedDate           DateTime @map("posted_date")
-  responseDate         DateTime @map("response_date")
+  deliveryRequirements String?   @map("delivery_requirements")
+  placeOfPerformance   String?   @map("place_of_performance")
+  pointOfContact       String?   @map("point_of_contact")
+  postedDate           DateTime  @map("posted_date")
+  responseDate         DateTime  @map("response_date")
   archiveDate          DateTime? @map("archive_date")
-  productCategory      String?  @map("product_category")
+  productCategory      String?   @map("product_category")
   certifications       String[]
-  rawData              Json?    @map("raw_data")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  rawData              Json?     @map("raw_data")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   savedOpportunities SavedOpportunity[]
   analyses           OpportunityAnalysis[]
@@ -144,6 +146,30 @@ model SavedOpportunity {
 
   @@unique([opportunityId, userId])
   @@map("saved_opportunities")
+}
+
+model OpportunitySearch {
+  id              String    @id @default(uuid())
+  name            String
+  keyword         String?
+  naicsCode       String?   @map("naics_code")
+  agency          String?
+  setAside        String?   @map("set_aside")
+  source          String?
+  limit           Int       @default(25)
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  lastResultCount Int?      @map("last_result_count")
+  userId          String    @map("user_id")
+  organizationId  String    @map("organization_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([organizationId])
+  @@map("opportunity_searches")
 }
 
 model OpportunityAnalysis {
@@ -201,19 +227,19 @@ model Supplier {
 }
 
 model SupplierQuote {
-  id                 String   @id @default(uuid())
-  supplierId         String   @map("supplier_id")
-  opportunityId      String?  @map("opportunity_id")
-  productDescription String   @map("product_description")
-  unitPrice          Decimal  @map("unit_price")
+  id                 String    @id @default(uuid())
+  supplierId         String    @map("supplier_id")
+  opportunityId      String?   @map("opportunity_id")
+  productDescription String    @map("product_description")
+  unitPrice          Decimal   @map("unit_price")
   quantity           Int
-  totalPrice         Decimal  @map("total_price")
-  leadTime           String?  @map("lead_time")
+  totalPrice         Decimal   @map("total_price")
+  leadTime           String?   @map("lead_time")
   validUntil         DateTime? @map("valid_until")
-  status             String   @default("pending")
+  status             String    @default("pending")
   notes              String?
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   supplier    Supplier     @relation(fields: [supplierId], references: [id])
   opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
@@ -246,21 +272,21 @@ model Product {
 // ============================================================
 
 model ComplianceProfile {
-  id                 String   @id @default(uuid())
-  organizationId     String   @unique @map("organization_id")
-  ueiRegistered      Boolean  @default(false) @map("uei_registered")
-  samRegistered      Boolean  @default(false) @map("sam_registered")
-  cageCode           Boolean  @default(false) @map("cage_code")
-  naicsCodes         Boolean  @default(false) @map("naics_codes")
-  pscCodes           Boolean  @default(false) @map("psc_codes")
-  businessBankAccount Boolean @default(false) @map("business_bank_account")
-  insurance          Boolean  @default(false)
-  capabilityStatement Boolean @default(false) @map("capability_statement")
-  pastPerformance    Boolean  @default(false) @map("past_performance")
-  certifications     String[]
+  id                  String   @id @default(uuid())
+  organizationId      String   @unique @map("organization_id")
+  ueiRegistered       Boolean  @default(false) @map("uei_registered")
+  samRegistered       Boolean  @default(false) @map("sam_registered")
+  cageCode            Boolean  @default(false) @map("cage_code")
+  naicsCodes          Boolean  @default(false) @map("naics_codes")
+  pscCodes            Boolean  @default(false) @map("psc_codes")
+  businessBankAccount Boolean  @default(false) @map("business_bank_account")
+  insurance           Boolean  @default(false)
+  capabilityStatement Boolean  @default(false) @map("capability_statement")
+  pastPerformance     Boolean  @default(false) @map("past_performance")
+  certifications      String[]
   setAsideEligibility String[] @map("set_aside_eligibility")
-  readinessScore     Int      @default(0) @map("readiness_score")
-  lastUpdated        DateTime @default(now()) @map("last_updated")
+  readinessScore      Int      @default(0) @map("readiness_score")
+  lastUpdated         DateTime @default(now()) @map("last_updated")
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -284,9 +310,9 @@ model Document {
   opportunityId  String?  @map("opportunity_id")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  user         User          @relation(fields: [uploadedBy], references: [id])
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  opportunity  Opportunity?  @relation(fields: [opportunityId], references: [id])
+  user         User         @relation(fields: [uploadedBy], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  opportunity  Opportunity? @relation(fields: [opportunityId], references: [id])
 
   @@map("documents")
 }
@@ -296,16 +322,16 @@ model Document {
 // ============================================================
 
 model BidWorkflow {
-  id             String   @id @default(uuid())
-  opportunityId  String   @map("opportunity_id")
-  organizationId String   @map("organization_id")
-  stage          String   @default("discovered")
-  assignedTo     String?  @map("assigned_to")
-  priority       String   @default("medium")
+  id             String    @id @default(uuid())
+  opportunityId  String    @map("opportunity_id")
+  organizationId String    @map("organization_id")
+  stage          String    @default("discovered")
+  assignedTo     String?   @map("assigned_to")
+  priority       String    @default("medium")
   dueDate        DateTime? @map("due_date")
   notes          String?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   opportunity  Opportunity    @relation(fields: [opportunityId], references: [id])
   organization Organization   @relation(fields: [organizationId], references: [id])
@@ -315,18 +341,18 @@ model BidWorkflow {
 }
 
 model WorkflowTask {
-  id          String   @id @default(uuid())
-  workflowId  String   @map("workflow_id")
+  id          String    @id @default(uuid())
+  workflowId  String    @map("workflow_id")
   title       String
   description String?
-  status      String   @default("pending")
-  assignedTo  String?  @map("assigned_to")
+  status      String    @default("pending")
+  assignedTo  String?   @map("assigned_to")
   dueDate     DateTime? @map("due_date")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   workflow BidWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  assignee User?      @relation("AssignedTasks", fields: [assignedTo], references: [id])
+  assignee User?       @relation("AssignedTasks", fields: [assignedTo], references: [id])
 
   @@map("workflow_tasks")
 }
@@ -336,13 +362,13 @@ model WorkflowTask {
 // ============================================================
 
 model Note {
-  id          String   @id @default(uuid())
-  entityType  String   @map("entity_type")
-  entityId    String   @map("entity_id")
-  content     String
-  userId      String   @map("user_id")
-  opportunityId String? @map("opportunity_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  content       String
+  userId        String   @map("user_id")
+  opportunityId String?  @map("opportunity_id")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   user        User         @relation(fields: [userId], references: [id])
   opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
@@ -388,14 +414,14 @@ model AuditLog {
 }
 
 model Integration {
-  id             String   @id @default(uuid())
-  organizationId String   @map("organization_id")
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
   provider       String
-  status         String   @default("disconnected")
+  status         String    @default("disconnected")
   config         Json?
   lastSyncAt     DateTime? @map("last_sync_at")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id])
 

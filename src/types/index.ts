@@ -63,6 +63,23 @@ export interface SavedOpportunity {
   opportunity: Opportunity;
 }
 
+export interface OpportunitySearch {
+  id: string;
+  name: string;
+  keyword?: string | null;
+  naicsCode?: string | null;
+  agency?: string | null;
+  setAside?: string | null;
+  source?: string | null;
+  limit: number;
+  lastSyncedAt?: string | null;
+  lastResultCount?: number | null;
+  userId: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OpportunityAnalysis {
   id: string;
   opportunityId: string;
