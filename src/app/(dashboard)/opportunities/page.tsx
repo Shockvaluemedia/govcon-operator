@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Filter, ArrowUpDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,28 +8,97 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { mockOpportunities } from "@/data/mock-opportunities";
 import { formatCurrency, formatDate, calculateDaysUntil } from "@/lib/utils";
+import type { Opportunity } from "@/types";
+
+interface OpportunitiesResponse {
+  data?: Array<Opportunity & { estimatedValue: number | string }>;
+  error?: string;
+  meta?: {
+    source?: string;
+    total?: number;
+  };
+}
+
+function normalizeOpportunity(opp: Opportunity & { estimatedValue: number | string }): Opportunity {
+  return {
+    ...opp,
+    estimatedValue: Number(opp.estimatedValue || 0),
+    matchScore: Number(opp.matchScore || 0),
+    riskScore: Number(opp.riskScore || 0),
+  };
+}
 
 export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [agencyFilter, setAgencyFilter] = useState("all");
   const [setAsideFilter, setSetAsideFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [total, setTotal] = useState(0);
+  const [source, setSource] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  const filteredOpportunities = mockOpportunities.filter((opp) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      opp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opp.solicitationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opp.agency.toLowerCase().includes(searchQuery.toLowerCase());
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
 
-    const matchesAgency = agencyFilter === "all" || opp.agency.includes(agencyFilter);
-    const matchesSetAside = setAsideFilter === "all" || opp.setAsideType === setAsideFilter;
-    const matchesSource = sourceFilter === "all" || opp.source === sourceFilter;
+    if (deferredSearchQuery.trim()) params.set("keyword", deferredSearchQuery.trim());
+    if (agencyFilter !== "all") params.set("agency", agencyFilter);
+    if (setAsideFilter !== "all") params.set("setAside", setAsideFilter);
+    if (sourceFilter !== "all") params.set("source", sourceFilter);
+    params.set("limit", "50");
 
-    return matchesSearch && matchesAgency && matchesSetAside && matchesSource;
-  });
+    return params.toString();
+  }, [agencyFilter, deferredSearchQuery, setAsideFilter, sourceFilter]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadOpportunities() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`/api/opportunities?${queryString}`, {
+          headers: { "x-govcon-data-mode": "database" },
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as OpportunitiesResponse;
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Failed to load opportunities");
+        }
+
+        const rows = (payload.data || []).map(normalizeOpportunity);
+        setOpportunities(rows);
+        setTotal(payload.meta?.total ?? rows.length);
+        setSource(payload.meta?.source || null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setOpportunities([]);
+        setTotal(0);
+        setSource(null);
+        setError(err instanceof Error ? err.message : "Failed to load opportunities");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadOpportunities();
+
+    return () => controller.abort();
+  }, [queryString]);
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setAgencyFilter("all");
+    setSetAsideFilter("all");
+    setSourceFilter("all");
+  };
 
   return (
     <div className="space-y-6">
@@ -40,8 +109,8 @@ export default function OpportunitiesPage() {
             Search and filter government contract opportunities
           </p>
         </div>
-        <Badge variant="secondary" className="text-sm">
-          {filteredOpportunities.length} opportunities
+        <Badge variant={source === "database" ? "success" : "secondary"} className="text-sm">
+          {loading ? "Loading..." : `${total} opportunities`}
         </Badge>
       </div>
 
@@ -106,6 +175,18 @@ export default function OpportunitiesPage() {
         </CardContent>
       </Card>
 
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-sm font-medium text-red-700">Unable to load opportunities</p>
+            <p className="mt-1 text-sm text-red-600">{error}</p>
+            <Button variant="outline" className="mt-3" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Opportunities Table */}
       <Card>
         <CardHeader className="pb-3">
@@ -130,7 +211,7 @@ export default function OpportunitiesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOpportunities.map((opp) => {
+                {opportunities.map((opp) => {
                   const daysUntilDue = calculateDaysUntil(opp.dueDate);
                   return (
                     <tr key={opp.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -182,10 +263,15 @@ export default function OpportunitiesPage() {
               </tbody>
             </table>
           </div>
-          {filteredOpportunities.length === 0 && (
+          {loading && (
+            <div className="py-12 text-center">
+              <p className="text-sm text-gray-500">Loading opportunities...</p>
+            </div>
+          )}
+          {!loading && opportunities.length === 0 && !error && (
             <div className="text-center py-12">
               <p className="text-gray-500">No opportunities match your filters.</p>
-              <Button variant="ghost" className="mt-2" onClick={() => { setSearchQuery(""); setAgencyFilter("all"); setSetAsideFilter("all"); setSourceFilter("all"); }}>
+              <Button variant="ghost" className="mt-2" onClick={clearFilters}>
                 Clear filters
               </Button>
             </div>

@@ -1,7 +1,41 @@
 const baseUrl = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
+const demoEmail = process.env.SMOKE_DEMO_EMAIL ?? "demo@govcon-operator.com";
+const demoPassword = process.env.SMOKE_DEMO_PASSWORD ?? "demo-password";
+const cookies = new Map();
+
+function storeCookies(response) {
+  const setCookies =
+    typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : [response.headers.get("set-cookie")].filter(Boolean);
+
+  for (const setCookie of setCookies) {
+    const [pair] = setCookie.split(";");
+    const separatorIndex = pair.indexOf("=");
+    if (separatorIndex === -1) continue;
+    cookies.set(pair.slice(0, separatorIndex), pair.slice(separatorIndex + 1));
+  }
+}
+
+function cookieHeader() {
+  return Array.from(cookies.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
+}
 
 async function request(path, options) {
-  const response = await fetch(`${baseUrl}${path}`, options);
+  const headers = new Headers(options?.headers ?? {});
+  const cookie = cookieHeader();
+  if (cookie) {
+    headers.set("Cookie", cookie);
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers,
+  });
+  storeCookies(response);
+
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
     ? await response.json()
@@ -34,12 +68,39 @@ async function checkProtectedRoute(path) {
   console.log(`ok auth gate ${path} -> ${location}`);
 }
 
-async function checkCollection(path, label, minimum = 1) {
-  const payload = await request(path);
+async function login() {
+  await request("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: demoEmail, password: demoPassword }),
+  });
+
+  assert(cookies.has("access_token"), "Login did not set an access_token cookie");
+  console.log(`ok auth login ${demoEmail}`);
+}
+
+async function checkCollection(path, label, minimum = 1, expectedSource) {
+  const payload = await request(path, {
+    headers: expectedSource ? { "x-govcon-data-mode": expectedSource } : undefined,
+  });
   assert(Array.isArray(payload.data), `${path} did not return a data array`);
   assert(payload.data.length >= minimum, `${path} returned ${payload.data.length} ${label}; expected at least ${minimum}`);
+  if (expectedSource) {
+    assert(payload.meta?.source === expectedSource, `${path} returned ${payload.meta?.source || "unknown"} data; expected ${expectedSource}`);
+  }
   console.log(`ok api ${path}: ${payload.data.length} ${label}`);
   return payload.data;
+}
+
+async function checkDashboardMetrics() {
+  const payload = await request("/api/dashboard", {
+    headers: { "x-govcon-data-mode": "database" },
+  });
+
+  assert(payload.meta?.source === "database", "/api/dashboard did not return database metrics");
+  assert(payload.data?.activeBids >= 1, "/api/dashboard did not include active bids");
+  assert(payload.data?.complianceScore >= 1, "/api/dashboard did not include compliance score");
+  console.log(`ok api /api/dashboard: ${payload.data.activeBids} active bids`);
 }
 
 async function main() {
@@ -52,9 +113,15 @@ async function main() {
   await checkProtectedRoute("/compliance");
   await checkProtectedRoute("/workflows");
 
-  const opportunities = await checkCollection("/api/opportunities", "opportunities", 8);
-  await checkCollection("/api/suppliers", "suppliers", 5);
-  await checkCollection("/api/workflows", "workflows", 5);
+  await login();
+  await checkPage("/dashboard", "Dashboard");
+  await checkPage("/opportunities", "Opportunity Discovery");
+  await checkPage("/suppliers", "Supplier Sourcing");
+
+  await checkDashboardMetrics();
+  const opportunities = await checkCollection("/api/opportunities", "opportunities", 8, "database");
+  await checkCollection("/api/suppliers", "suppliers", 5, "database");
+  await checkCollection("/api/workflows", "workflows", 5, "database");
 
   const analysis = await request("/api/ai/analyze", {
     method: "POST",

@@ -1,14 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
 import { DashboardMetrics } from "@/types";
 
 // GET /api/dashboard - Get dashboard metrics
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const databaseRequired = requiresDatabase(request);
+
   try {
     const user = await getCurrentUser();
 
     if (user) {
+      const safeQuery = <T>(promise: Promise<T>, fallback: T): Promise<T> => {
+        return databaseRequired ? promise : promise.catch(() => fallback);
+      };
+
       const [
         savedCount,
         activeWorkflows,
@@ -16,32 +23,32 @@ export async function GET() {
         pendingQuotes,
         tasksDue,
       ] = await Promise.all([
-        prisma.savedOpportunity.count({
+        safeQuery(prisma.savedOpportunity.count({
           where: { organizationId: user.organizationId },
-        }).catch(() => 0),
-        prisma.bidWorkflow.findMany({
+        }), 0),
+        safeQuery(prisma.bidWorkflow.findMany({
           where: {
             organizationId: user.organizationId,
             stage: { notIn: ["completed", "lost"] },
           },
           include: { opportunity: true },
-        }).catch(() => []),
-        prisma.complianceProfile.findUnique({
+        }), []),
+        safeQuery(prisma.complianceProfile.findUnique({
           where: { organizationId: user.organizationId },
-        }).catch(() => null),
-        prisma.supplierQuote.count({
+        }), null),
+        safeQuery(prisma.supplierQuote.count({
           where: {
             status: "pending",
             supplier: { organizationId: user.organizationId },
           },
-        }).catch(() => 0),
-        prisma.workflowTask.count({
+        }), 0),
+        safeQuery(prisma.workflowTask.count({
           where: {
             status: { in: ["pending", "in_progress"] },
             workflow: { organizationId: user.organizationId },
             dueDate: { lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
           },
-        }).catch(() => 0),
+        }), 0),
       ]);
 
       const estimatedRevenue = activeWorkflows.reduce(
@@ -68,7 +75,11 @@ export async function GET() {
         ),
       };
 
-      return NextResponse.json({ data: metrics });
+      return NextResponse.json({ data: metrics, meta: databaseMeta() });
+    }
+
+    if (databaseRequired) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Fallback mock metrics
@@ -90,6 +101,14 @@ export async function GET() {
 
     return NextResponse.json({ data: metrics, meta: { source: "mock" } });
   } catch (error) {
+    if (databaseRequired) {
+      console.error("Database required for dashboard but unavailable:", error);
+      return NextResponse.json(
+        { error: "Database unavailable", meta: { source: "database" } },
+        { status: 503 }
+      );
+    }
+
     console.warn("Dashboard metrics error:", error);
     return NextResponse.json({
       data: {

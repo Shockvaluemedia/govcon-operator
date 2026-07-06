@@ -40,6 +40,10 @@ interface RegisterData {
   organizationName: string;
 }
 
+interface RegisterResponse {
+  needsConfirmation?: boolean;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function useAuth(): AuthContextType {
@@ -104,7 +108,8 @@ export function useAuthProvider(): AuthContextType {
       throw new Error(responseData.error || "Registration failed");
     }
 
-    return { needsConfirmation: true };
+    const responseData = (await res.json()) as RegisterResponse;
+    return { needsConfirmation: responseData.needsConfirmation ?? true };
   };
 
   const confirmEmail = async (email: string, code: string) => {

@@ -181,6 +181,7 @@ export interface BidWorkflow {
   createdAt: string;
   updatedAt: string;
   opportunity: Opportunity;
+  tasks?: WorkflowTask[];
 }
 
 export interface WorkflowTask {

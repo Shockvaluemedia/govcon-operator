@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { signUp } from "@/lib/auth";
+import { isDemoAuthEnabled, signUp } from "@/lib/auth";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message: "Registration successful. Please check your email for verification code.",
+        needsConfirmation: !isDemoAuthEnabled(),
         userSub: result.userSub,
       },
       { status: 201 }

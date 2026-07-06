@@ -69,6 +69,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (error instanceof Error && error.message.includes("Demo user not found")) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 401 }
+      );
+    }
+
     console.error("Login error:", error);
     return NextResponse.json(
       { error: "Login failed" },

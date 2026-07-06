@@ -2,11 +2,15 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const { register, login } = useAuth();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -14,11 +18,29 @@ export default function RegisterPage() {
     password: "",
     organizationName: "",
   });
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In production, this would call AWS Cognito for registration
-    window.location.href = "/dashboard";
+    setError(null);
+    setMessage(null);
+    setSubmitting(true);
+
+    try {
+      const result = await register(formData);
+      if (result.needsConfirmation) {
+        setMessage("Registration created. Check your email for the verification code before signing in.");
+      } else {
+        await login(formData.email, formData.password);
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +68,17 @@ export default function RegisterPage() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          {message && (
+            <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              {message}
+            </div>
+          )}
+
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -120,8 +153,8 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" size="lg">
-            Create Account
+          <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+            {submitting ? "Creating account..." : "Create Account"}
           </Button>
 
           <p className="text-xs text-center text-gray-500">

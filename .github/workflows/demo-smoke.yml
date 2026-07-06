@@ -1,0 +1,90 @@
+name: Demo Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  demo-smoke:
+    name: Lint, build, and smoke demo
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: govcon_operator
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d govcon_operator"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/govcon_operator
+      GOVCON_DEMO_AUTH: "true"
+      AI_PROVIDER: mock
+      AWS_REGION: us-east-1
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write demo environment
+        run: |
+          cat > .env.local <<'EOF'
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/govcon_operator
+          GOVCON_DEMO_AUTH=true
+          AI_PROVIDER=mock
+          AWS_REGION=us-east-1
+          EOF
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Prepare demo database
+        run: |
+          npm run db:push
+          npm run db:seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Start app
+        run: |
+          npm run start > /tmp/govcon-next.log 2>&1 &
+          echo $! > /tmp/govcon-next.pid
+
+      - name: Wait for app
+        run: |
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App did not become ready"
+          tail -100 /tmp/govcon-next.log || true
+          exit 1
+
+      - name: Run authenticated demo smoke
+        run: SMOKE_BASE_URL=http://127.0.0.1:3000 npm run demo:smoke
+
+      - name: Print app log on failure
+        if: failure()
+        run: tail -200 /tmp/govcon-next.log || true
