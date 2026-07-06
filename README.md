@@ -166,7 +166,7 @@ Placeholder adapters ready for real API integration:
 ## Deployment
 
 Designed for AWS deployment:
-- Next.js on AWS Amplify or Vercel
+- Next.js on AWS Amplify
 - PostgreSQL on AWS RDS
 - Documents on AWS S3
 - Auth via AWS Cognito
