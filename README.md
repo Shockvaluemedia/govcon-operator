@@ -81,6 +81,7 @@ Known MVP gaps:
 - Visual polish still needs a full `DESIGN.md` token pass across the dashboard and auth surfaces.
 - Production Cognito, S3, AI, and SAM.gov modes require real environment configuration.
 - Dashboard headline metrics are database-backed; some secondary dashboard panels still use seeded/demo content.
+- SAM.gov saved searches run in no-key mode locally; add `SAM_GOV_API_KEY` for live solicitation imports.
 
 ## Features
 
@@ -89,7 +90,7 @@ Known MVP gaps:
 | Landing Page | Demo-ready |
 | Auth Pages | Local demo login/register wired to API; Cognito path available for production |
 | Main Dashboard | Database-backed headline metrics; secondary panels still demo content |
-| Opportunity Discovery | Database-backed catalog and filters; live SAM.gov sync requires configuration |
+| Opportunity Discovery | Database-backed catalog, saved searches, and SAM.gov sync trigger; live imports require `SAM_GOV_API_KEY` |
 | Opportunity Detail | Demo-ready |
 | AI Bid Analyzer | Provider abstraction with mock default; OpenAI/Bedrock require keys |
 | Supplier Sourcing | Database-backed list/create flow with seeded quotes |

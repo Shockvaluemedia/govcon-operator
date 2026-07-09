@@ -8,6 +8,10 @@ import { Opportunity } from "@/types";
 const SAM_API_BASE = "https://api.sam.gov/opportunities/v2";
 const SAM_API_KEY = process.env.SAM_GOV_API_KEY || "";
 
+export function isSAMConfigured(): boolean {
+  return Boolean(SAM_API_KEY);
+}
+
 interface SAMSearchParams {
   keyword?: string;
   naicsCode?: string;
