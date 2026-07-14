@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   DndContext,
   DragOverlay,
@@ -13,22 +14,43 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Calendar, ChevronLeft, ChevronRight, DollarSign, GripVertical, ListChecks } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  Brain,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  DollarSign,
+  FileText,
+  GripVertical,
+  ListChecks,
+  Truck,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { BidWorkflow, Opportunity, WorkflowStage, WorkflowTask } from "@/types";
+import type {
+  BidWorkflow,
+  Note,
+  Opportunity,
+  OpportunityAnalysis,
+  SupplierQuote,
+  WorkflowStage,
+  WorkflowTask,
+} from "@/types";
 
 const stages: { key: WorkflowStage; label: string; color: string }[] = [
-  { key: "discovered", label: "Discovered", color: "bg-gray-100" },
-  { key: "under_review", label: "Under Review", color: "bg-blue-50" },
-  { key: "supplier_sourcing", label: "Supplier Sourcing", color: "bg-indigo-50" },
-  { key: "pricing", label: "Pricing", color: "bg-purple-50" },
+  { key: "discovered", label: "Discovered", color: "bg-slate-100" },
+  { key: "under_review", label: "Under Review", color: "bg-slate-50" },
+  { key: "supplier_sourcing", label: "Supplier Sourcing", color: "bg-emerald-50" },
+  { key: "pricing", label: "Pricing", color: "bg-amber-50" },
   { key: "compliance_check", label: "Compliance Check", color: "bg-amber-50" },
-  { key: "proposal_prep", label: "Proposal Prep", color: "bg-orange-50" },
-  { key: "submitted", label: "Submitted", color: "bg-cyan-50" },
-  { key: "awarded", label: "Awarded", color: "bg-green-50" },
+  { key: "proposal_prep", label: "Proposal Prep", color: "bg-stone-50" },
+  { key: "submitted", label: "Submitted", color: "bg-sky-50" },
+  { key: "awarded", label: "Awarded", color: "bg-emerald-50" },
   { key: "lost", label: "Lost", color: "bg-red-50" },
   { key: "fulfillment", label: "Fulfillment", color: "bg-teal-50" },
   { key: "completed", label: "Completed", color: "bg-emerald-50" },
@@ -46,6 +68,24 @@ const defaultStageKeys: WorkflowStage[] = [
 
 type ApiOpportunity = Omit<Opportunity, "estimatedValue"> & {
   estimatedValue: number | string;
+  analyses?: OpportunityAnalysis[];
+  notes?: Note[];
+  supplierQuotes?: ApiSupplierQuote[];
+};
+
+type ApiSupplierQuote = SupplierQuote & {
+  supplier?: { name: string };
+};
+
+type CommandOpportunity = Opportunity & {
+  analyses: OpportunityAnalysis[];
+  notes: Note[];
+  supplierQuotes: ApiSupplierQuote[];
+};
+
+type CommandWorkflow = Omit<BidWorkflow, "opportunity" | "tasks"> & {
+  opportunity: CommandOpportunity;
+  tasks?: WorkflowTask[];
 };
 
 type ApiWorkflow = Omit<BidWorkflow, "opportunity" | "tasks"> & {
@@ -62,12 +102,15 @@ interface WorkflowsResponse {
   };
 }
 
-function normalizeWorkflow(workflow: ApiWorkflow): BidWorkflow {
+function normalizeWorkflow(workflow: ApiWorkflow): CommandWorkflow {
   return {
     ...workflow,
     opportunity: {
       ...workflow.opportunity,
       estimatedValue: Number(workflow.opportunity.estimatedValue || 0),
+      analyses: workflow.opportunity.analyses || [],
+      notes: workflow.opportunity.notes || [],
+      supplierQuotes: workflow.opportunity.supplierQuotes || [],
     },
     tasks: workflow.tasks || [],
   };
@@ -82,16 +125,74 @@ function adjacentStage(stageKey: WorkflowStage, direction: -1 | 1) {
   return stages[currentIndex + direction]?.key || null;
 }
 
+function sortOpenTasks(tasks: WorkflowTask[]) {
+  return [...tasks]
+    .filter((task) => task.status !== "completed")
+    .sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return a.createdAt.localeCompare(b.createdAt);
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+}
+
+function getWorkflowCommand(workflow: CommandWorkflow) {
+  const latestAnalysis = workflow.opportunity.analyses[0];
+  const quotes = workflow.opportunity.supplierQuotes;
+  const draftCount = workflow.opportunity.notes.length;
+  const nextTask = sortOpenTasks(workflow.tasks || [])[0];
+
+  if (!latestAnalysis) {
+    return {
+      label: "Run bid analysis",
+      detail: "No bid/no-bid proof yet",
+      tone: "warning" as const,
+    };
+  }
+
+  if (workflow.stage === "supplier_sourcing" && quotes.length === 0) {
+    return {
+      label: "Request supplier quotes",
+      detail: "Sourcing proof missing",
+      tone: "warning" as const,
+    };
+  }
+
+  if (workflow.stage === "proposal_prep" && draftCount === 0) {
+    return {
+      label: "Draft proposal",
+      detail: "No saved draft yet",
+      tone: "warning" as const,
+    };
+  }
+
+  if (nextTask) {
+    return {
+      label: nextTask.title,
+      detail: nextTask.dueDate ? `Due ${formatDate(nextTask.dueDate)}` : "Next open task",
+      tone: nextTask.dueDate && new Date(nextTask.dueDate) < new Date()
+        ? ("destructive" as const)
+        : ("secondary" as const),
+    };
+  }
+
+  return {
+    label: "Ready for stage review",
+    detail: "All visible tasks complete",
+    tone: "success" as const,
+  };
+}
+
 function WorkflowCard({
   workflow,
   isDragging,
   updating,
   onMove,
 }: {
-  workflow: BidWorkflow;
+  workflow: CommandWorkflow;
   isDragging?: boolean;
   updating?: boolean;
-  onMove: (workflow: BidWorkflow, stage: WorkflowStage) => void;
+  onMove: (workflow: CommandWorkflow, stage: WorkflowStage) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: workflow.id,
@@ -101,6 +202,13 @@ function WorkflowCard({
   const completedTaskCount = tasks.filter((task) => task.status === "completed").length;
   const previousStage = adjacentStage(workflow.stage, -1);
   const nextStage = adjacentStage(workflow.stage, 1);
+  const latestAnalysis = workflow.opportunity.analyses[0];
+  const quoteCount = workflow.opportunity.supplierQuotes.length;
+  const receivedQuoteCount = workflow.opportunity.supplierQuotes.filter(
+    (quote) => quote.status === "received" || quote.status === "accepted"
+  ).length;
+  const draftCount = workflow.opportunity.notes.length;
+  const command = getWorkflowCommand(workflow);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -161,7 +269,60 @@ function WorkflowCard({
               {tasks.length > 0 ? `${completedTaskCount}/${tasks.length} tasks complete` : "No tasks yet"}
             </div>
 
+            <div className="grid grid-cols-3 gap-1 pl-6 text-xs">
+              <Badge
+                variant={
+                  latestAnalysis?.bidRecommendation === "bid"
+                    ? "success"
+                    : latestAnalysis?.bidRecommendation === "no-bid"
+                      ? "destructive"
+                      : "warning"
+                }
+                className="justify-center gap-1 truncate"
+              >
+                <Brain className="h-3 w-3" />
+                {latestAnalysis?.bidRecommendation || "No AI"}
+              </Badge>
+              <Badge
+                variant={receivedQuoteCount > 0 ? "success" : quoteCount > 0 ? "warning" : "secondary"}
+                className="justify-center gap-1 truncate"
+              >
+                <Truck className="h-3 w-3" />
+                {receivedQuoteCount}/{quoteCount}
+              </Badge>
+              <Badge
+                variant={draftCount > 0 ? "success" : "secondary"}
+                className="justify-center gap-1 truncate"
+              >
+                <FileText className="h-3 w-3" />
+                {draftCount}
+              </Badge>
+            </div>
+
+            <div className="rounded-md border border-gray-200 bg-white p-2 pl-2">
+              <div className="flex items-start gap-2">
+                {command.tone === "destructive" ? (
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+                ) : command.tone === "warning" ? (
+                  <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                ) : (
+                  <ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600" />
+                )}
+                <div className="min-w-0">
+                  <p className="line-clamp-1 text-xs font-medium text-gray-900">
+                    {command.label}
+                  </p>
+                  <p className="line-clamp-1 text-xs text-gray-500">{command.detail}</p>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 pl-6 pt-1">
+              <Button asChild className="h-7 px-2" size="sm" variant="ghost">
+                <Link href={`/opportunities/${workflow.opportunity.id}`} aria-label={`Open ${workflow.opportunity.title}`}>
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </Button>
               <Button
                 aria-label={`Move ${workflow.opportunity.title} to ${previousStage ? stageLabel(previousStage) : "previous stage"}`}
                 className="h-7 px-2"
@@ -200,9 +361,9 @@ function StageColumn({
   onMove,
 }: {
   stage: { key: WorkflowStage; label: string; color: string };
-  workflows: BidWorkflow[];
+  workflows: CommandWorkflow[];
   updatingWorkflowId: string | null;
-  onMove: (workflow: BidWorkflow, stage: WorkflowStage) => void;
+  onMove: (workflow: CommandWorkflow, stage: WorkflowStage) => void;
 }) {
   return (
     <div className="w-72 flex-shrink-0">
@@ -240,8 +401,8 @@ function StageColumn({
 }
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState<BidWorkflow[]>([]);
-  const [activeWorkflow, setActiveWorkflow] = useState<BidWorkflow | null>(null);
+  const [workflows, setWorkflows] = useState<CommandWorkflow[]>([]);
+  const [activeWorkflow, setActiveWorkflow] = useState<CommandWorkflow | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -303,7 +464,7 @@ export default function WorkflowsPage() {
     return () => controller.abort();
   }, [fetchWorkflows]);
 
-  const updateWorkflowStage = useCallback(async (workflow: BidWorkflow, targetStage: WorkflowStage) => {
+  const updateWorkflowStage = useCallback(async (workflow: CommandWorkflow, targetStage: WorkflowStage) => {
     if (workflow.stage === targetStage) return;
 
     setUpdateError(null);
@@ -385,6 +546,18 @@ export default function WorkflowsPage() {
     (sum, workflow) => sum + (workflow.tasks || []).filter((task) => task.status === "completed").length,
     0
   );
+  const actionNeededCount = workflows.filter((workflow) => {
+    const tone = getWorkflowCommand(workflow).tone;
+    return tone === "warning" || tone === "destructive";
+  }).length;
+  const quoteCount = workflows.reduce(
+    (sum, workflow) => sum + workflow.opportunity.supplierQuotes.length,
+    0
+  );
+  const proposalDraftCount = workflows.reduce(
+    (sum, workflow) => sum + workflow.opportunity.notes.length,
+    0
+  );
 
   return (
     <div className="min-w-0 space-y-6">
@@ -392,7 +565,7 @@ export default function WorkflowsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bid Workflow Board</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Track bid stages, task progress, and pipeline value
+            Track bid stages, next actions, proof, and pipeline value
           </p>
         </div>
         <Badge variant={source === "database" ? "success" : "secondary"} className="w-fit">
@@ -474,32 +647,44 @@ export default function WorkflowsPage() {
           <CardTitle className="text-base">Pipeline Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-            <div className="rounded-lg bg-gray-50 p-3 text-center">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-7">
+            <div className="rounded-md bg-slate-50 p-3 text-center">
               <p className="text-2xl font-bold text-gray-900">{workflows.length}</p>
               <p className="text-xs text-gray-500">Total in Pipeline</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 text-center">
+            <div className="rounded-md bg-slate-50 p-3 text-center">
               <p className="text-2xl font-bold text-gray-900">
                 {formatCurrency(workflows.reduce((sum, workflow) => sum + workflow.opportunity.estimatedValue, 0))}
               </p>
               <p className="text-xs text-gray-500">Pipeline Value</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 text-center">
+            <div className="rounded-md bg-amber-50 p-3 text-center">
+              <p className="text-2xl font-bold text-amber-700">{actionNeededCount}</p>
+              <p className="text-xs text-amber-700">Need Action</p>
+            </div>
+            <div className="rounded-md bg-amber-50 p-3 text-center">
               <p className="text-2xl font-bold text-amber-600">
                 {workflows.filter((workflow) => workflow.priority === "high" || workflow.priority === "critical").length}
               </p>
               <p className="text-xs text-gray-500">High Priority</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 text-center">
-              <p className="text-2xl font-bold text-blue-600">{dueThisWeekCount}</p>
+            <div className="rounded-md bg-slate-50 p-3 text-center">
+              <p className="text-2xl font-bold text-slate-700">{dueThisWeekCount}</p>
               <p className="text-xs text-gray-500">Due This Week</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 text-center">
-              <p className="text-2xl font-bold text-green-600">
+            <div className="rounded-md bg-emerald-50 p-3 text-center">
+              <p className="text-2xl font-bold text-emerald-700">{quoteCount}</p>
+              <p className="text-xs text-emerald-700">Quotes</p>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3 text-center">
+              <p className="text-2xl font-bold text-slate-700">{proposalDraftCount}</p>
+              <p className="text-xs text-gray-500">Drafts</p>
+            </div>
+            <div className="rounded-md bg-emerald-50 p-3 text-center">
+              <p className="text-2xl font-bold text-emerald-700">
                 {completedTaskCount}/{totalTaskCount}
               </p>
-              <p className="text-xs text-gray-500">Tasks Complete</p>
+              <p className="text-xs text-emerald-700">Tasks</p>
             </div>
           </div>
         </CardContent>

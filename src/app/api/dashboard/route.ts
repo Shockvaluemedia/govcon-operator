@@ -2,26 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
-import { DashboardMetrics } from "@/types";
+import type { DashboardMetrics } from "@/types";
 
 // GET /api/dashboard - Get dashboard metrics
 export async function GET(request: NextRequest) {
   const databaseRequired = requiresDatabase(request);
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
-    const user = await getCurrentUser();
-
     if (user) {
       const safeQuery = <T>(promise: Promise<T>, fallback: T): Promise<T> => {
         return databaseRequired ? promise : promise.catch(() => fallback);
       };
+      const dueThisWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const [
         savedCount,
         activeWorkflows,
         complianceProfile,
-        pendingQuotes,
-        tasksDue,
+        pendingQuotesCount,
+        tasksDueCount,
+        quoteItems,
+        taskItems,
       ] = await Promise.all([
         safeQuery(prisma.savedOpportunity.count({
           where: { organizationId: user.organizationId },
@@ -46,9 +52,28 @@ export async function GET(request: NextRequest) {
           where: {
             status: { in: ["pending", "in_progress"] },
             workflow: { organizationId: user.organizationId },
-            dueDate: { lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+            dueDate: { lte: dueThisWeek },
           },
         }), 0),
+        safeQuery(prisma.supplierQuote.findMany({
+          where: {
+            status: { in: ["pending", "received"] },
+            supplier: { organizationId: user.organizationId },
+          },
+          include: { supplier: true, opportunity: true },
+          orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+          take: 3,
+        }), []),
+        safeQuery(prisma.workflowTask.findMany({
+          where: {
+            status: { in: ["pending", "in_progress"] },
+            workflow: { organizationId: user.organizationId },
+            dueDate: { lte: dueThisWeek },
+          },
+          include: { workflow: { include: { opportunity: true } } },
+          orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
+          take: 4,
+        }), []),
       ]);
 
       const estimatedRevenue = activeWorkflows.reduce(
@@ -58,48 +83,66 @@ export async function GET(request: NextRequest) {
 
       const highRisk = activeWorkflows.filter(
         (wf) => (wf.opportunity.riskScore || 0) >= 50
-      ).length;
+      );
+      const complianceSummary = summarizeCompliance(complianceProfile);
 
       const metrics: DashboardMetrics = {
         totalSavedOpportunities: savedCount,
         activeBids: activeWorkflows.length,
         complianceScore: complianceProfile?.readinessScore || 0,
         estimatedRevenue,
-        highRiskOpportunities: highRisk,
-        tasksDue,
-        pendingQuotes,
+        highRiskOpportunities: highRisk.length,
+        tasksDue: tasksDueCount,
+        pendingQuotes: pendingQuotesCount,
         recommendedActions: generateRecommendations(
           complianceProfile?.readinessScore || 0,
           activeWorkflows.length,
           savedCount
         ),
+        highRiskItems: highRisk
+          .sort(
+            (a, b) =>
+              (b.opportunity.riskScore || 0) -
+              (a.opportunity.riskScore || 0)
+          )
+          .slice(0, 3)
+          .map((workflow) => ({
+            id: workflow.id,
+            title: workflow.opportunity.title,
+            riskScore: workflow.opportunity.riskScore || 0,
+            reason: riskReason(
+              workflow.opportunity.riskScore || 0,
+              workflow.stage
+            ),
+            dueDate: workflow.opportunity.dueDate.toISOString(),
+          })),
+        taskItems: taskItems.map((task) => ({
+          id: task.id,
+          title: task.title,
+          status: task.status,
+          priority:
+            task.status === "blocked"
+              ? "critical"
+              : task.dueDate && task.dueDate < new Date()
+                ? "high"
+                : "medium",
+          dueDate: task.dueDate?.toISOString(),
+          opportunityTitle: task.workflow.opportunity.title,
+        })),
+        quoteItems: quoteItems.map((quote) => ({
+          id: quote.id,
+          supplierName: quote.supplier.name,
+          productDescription: quote.productDescription,
+          status: quote.status,
+          totalPrice: Number(quote.totalPrice || 0),
+        })),
+        complianceSummary,
       };
 
       return NextResponse.json({ data: metrics, meta: databaseMeta() });
     }
 
-    if (databaseRequired) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Fallback mock metrics
-    const metrics: DashboardMetrics = {
-      totalSavedOpportunities: 12,
-      activeBids: 5,
-      complianceScore: 72,
-      estimatedRevenue: 1236000,
-      highRiskOpportunities: 3,
-      tasksDue: 4,
-      pendingQuotes: 2,
-      recommendedActions: [
-        "Complete your Capability Statement to increase compliance score",
-        "Request quotes for upcoming bid deadlines",
-        "Review new opportunities matching your NAICS codes",
-        "Update SAM.gov registration if renewal is approaching",
-      ],
-    };
-
-    return NextResponse.json({ data: metrics, meta: { source: "mock" } });
+    return NextResponse.json({ error: "Dashboard unavailable" }, { status: 503 });
   } catch (error) {
     if (databaseRequired) {
       console.error("Database required for dashboard but unavailable:", error);
@@ -120,9 +163,57 @@ export async function GET(request: NextRequest) {
         tasksDue: 0,
         pendingQuotes: 0,
         recommendedActions: ["Set up your profile to get started"],
+        highRiskItems: [],
+        taskItems: [],
+        quoteItems: [],
+        complianceSummary: { completed: 0, missing: 0, total: 0, missingItems: [] },
       },
     });
   }
+}
+
+function riskReason(riskScore: number, stage: string): string {
+  if (riskScore >= 70) return "Review compliance, supplier, and timeline risk";
+  if (riskScore >= 50) return "Risk review recommended before bid decision";
+  return `Currently in ${stage.replaceAll("_", " ")}`;
+}
+
+function summarizeCompliance(profile: {
+  ueiRegistered: boolean;
+  samRegistered: boolean;
+  cageCode: boolean;
+  naicsCodes: boolean;
+  pscCodes: boolean;
+  businessBankAccount: boolean;
+  insurance: boolean;
+  capabilityStatement: boolean;
+  pastPerformance: boolean;
+  certifications: string[];
+} | null) {
+  const checks = [
+    ["UEI registered", profile?.ueiRegistered],
+    ["SAM.gov active", profile?.samRegistered],
+    ["CAGE code", profile?.cageCode],
+    ["NAICS codes", profile?.naicsCodes],
+    ["PSC codes", profile?.pscCodes],
+    ["Business bank account", profile?.businessBankAccount],
+    ["Insurance", profile?.insurance],
+    ["Capability statement", profile?.capabilityStatement],
+    ["Past performance", profile?.pastPerformance],
+    ["Certifications", Boolean(profile?.certifications?.length)],
+  ] as const;
+
+  const completed = checks.filter(([, value]) => Boolean(value)).length;
+  const missingItems = checks
+    .filter(([, value]) => !value)
+    .map(([label]) => label);
+
+  return {
+    completed,
+    missing: missingItems.length,
+    total: checks.length,
+    missingItems,
+  };
 }
 
 function generateRecommendations(

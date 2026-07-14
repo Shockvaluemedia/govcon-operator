@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
   const limit = parseInt(searchParams.get("limit") || "50");
   const offset = parseInt(searchParams.get("offset") || "0");
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     // Try database first
@@ -80,19 +85,16 @@ export async function GET(request: NextRequest) {
 
     // Apply matching engine to score opportunities
     try {
-      const user = await getCurrentUser();
-      if (user) {
-        const [org, compliance] = await Promise.all([
-          prisma.organization.findUnique({ where: { id: user.organizationId } }),
-          prisma.complianceProfile.findUnique({ where: { organizationId: user.organizationId } }),
-        ]);
-        if (org) {
-          const profile = buildOrganizationProfile(
-            org,
-            compliance ? { ...compliance, lastUpdated: compliance.lastUpdated.toISOString() } : null
-          );
-          results = scoreOpportunities(results, profile);
-        }
+      const [org, compliance] = await Promise.all([
+        prisma.organization.findUnique({ where: { id: user.organizationId } }),
+        prisma.complianceProfile.findUnique({ where: { organizationId: user.organizationId } }),
+      ]);
+      if (org) {
+        const profile = buildOrganizationProfile(
+          org,
+          compliance ? { ...compliance, lastUpdated: compliance.lastUpdated.toISOString() } : null
+        );
+        results = scoreOpportunities(results, profile);
       }
     } catch {
       // Continue without scoring

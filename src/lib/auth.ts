@@ -41,7 +41,12 @@ function hasConfiguredCognito(): boolean {
 }
 
 export function isDemoAuthEnabled(): boolean {
-  if (process.env.GOVCON_DEMO_AUTH === "true") return true;
+  if (process.env.GOVCON_DEMO_AUTH === "true") {
+    return (
+      process.env.NODE_ENV !== "production" ||
+      process.env.GOVCON_DEMO_AUTH_ALLOW_PRODUCTION_BUILD === "true"
+    );
+  }
   if (process.env.GOVCON_DEMO_AUTH === "false") return false;
   return process.env.NODE_ENV !== "production" && !hasConfiguredCognito();
 }
@@ -85,7 +90,9 @@ async function authUserFromEmail(email: string): Promise<AuthUser | null> {
     lastName: user.lastName,
     cognitoId: user.cognitoId || `demo-cognito:${user.email}`,
     organizationId: user.organizationId,
-    role: user.userRoles[0]?.role || "viewer",
+    role:
+      user.userRoles.find((role) => role.organizationId === user.organizationId)
+        ?.role || "viewer",
   };
 }
 
@@ -386,6 +393,10 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
       issuer: COGNITO_DOMAIN,
     });
 
+    if (payload.token_use !== "access" || payload.client_id !== CLIENT_ID) {
+      return null;
+    }
+
     const cognitoId = payload.sub as string;
 
     // Look up user in database
@@ -406,7 +417,9 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
       lastName: user.lastName,
       cognitoId: user.cognitoId!,
       organizationId: user.organizationId,
-      role: user.userRoles[0]?.role || "viewer",
+      role:
+        user.userRoles.find((role) => role.organizationId === user.organizationId)
+          ?.role || "viewer",
     };
   } catch (error) {
     console.error("Token verification failed:", error);

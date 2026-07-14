@@ -29,7 +29,10 @@ export async function GET() {
         email: fullUser.email,
         firstName: fullUser.firstName,
         lastName: fullUser.lastName,
-        role: fullUser.userRoles[0]?.role || "viewer",
+        role:
+          fullUser.userRoles.find(
+            (role) => role.organizationId === fullUser.organizationId
+          )?.role || "viewer",
         organization: {
           id: fullUser.organization.id,
           name: fullUser.organization.name,

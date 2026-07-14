@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchSAMOpportunities } from "@/services/integrations/sam-gov";
+import { getCurrentUser } from "@/lib/auth";
 
 // GET /api/opportunities/search - Search SAM.gov live
 export async function GET(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const keyword = searchParams.get("keyword") || undefined;
   const naicsCode = searchParams.get("naics") || undefined;

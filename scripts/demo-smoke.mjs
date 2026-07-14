@@ -68,6 +68,30 @@ async function checkProtectedRoute(path) {
   console.log(`ok auth gate ${path} -> ${location}`);
 }
 
+async function checkProtectedApi(method, path, body) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    redirect: "manual",
+  });
+
+  assert(response.status === 401, `${method} ${path} returned ${response.status}; expected 401`);
+  console.log(`ok api auth gate ${method} ${path}`);
+}
+
+async function checkLegacyAuthRetired() {
+  const response = await fetch(`${baseUrl}/api/auth`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: demoEmail, password: demoPassword }),
+  });
+
+  assert(response.status === 410, `POST /api/auth returned ${response.status}; expected 410`);
+  assert(!response.headers.get("set-cookie"), "Legacy auth endpoint set a cookie");
+  console.log("ok legacy auth endpoint retired");
+}
+
 async function login() {
   await request("/api/auth/login", {
     method: "POST",
@@ -77,6 +101,33 @@ async function login() {
 
   assert(cookies.has("access_token"), "Login did not set an access_token cookie");
   console.log(`ok auth login ${demoEmail}`);
+}
+
+async function checkComplianceInputBoundary() {
+  const response = await fetch(`${baseUrl}/api/compliance`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: cookieHeader(),
+    },
+    body: JSON.stringify({
+      ueiRegistered: true,
+      samRegistered: true,
+      cageCode: true,
+      naicsCodes: true,
+      pscCodes: true,
+      businessBankAccount: true,
+      insurance: true,
+      capabilityStatement: true,
+      pastPerformance: true,
+      certifications: [],
+      setAsideEligibility: [],
+      organizationId: "org-outside-session",
+    }),
+  });
+
+  assert(response.status === 400, `PUT /api/compliance accepted an unknown tenant field (${response.status})`);
+  console.log("ok compliance input boundary rejects tenant override");
 }
 
 async function checkCollection(path, label, minimum = 1, expectedSource) {
@@ -101,6 +152,16 @@ async function checkDashboardMetrics() {
   assert(payload.data?.activeBids >= 1, "/api/dashboard did not include active bids");
   assert(payload.data?.complianceScore >= 1, "/api/dashboard did not include compliance score");
   console.log(`ok api /api/dashboard: ${payload.data.activeBids} active bids`);
+}
+
+async function checkOpportunityDetail(opportunityId) {
+  const payload = await request(`/api/opportunities/${encodeURIComponent(opportunityId)}`, {
+    headers: { "x-govcon-data-mode": "database" },
+  });
+
+  assert(payload.data?.id === opportunityId, "Opportunity detail did not return the requested opportunity");
+  assert(payload.meta?.source === "database", "Opportunity detail did not use database source");
+  console.log(`ok api /api/opportunities/${opportunityId}: detail`);
 }
 
 async function checkSavedSearchSync() {
@@ -141,6 +202,39 @@ async function checkSavedSearchSync() {
   console.log(`ok api saved searches + SAM sync: ${sync.synced} synced`);
 }
 
+async function checkProposalDraft(opportunityId) {
+  const payload = await request("/api/ai/proposal-draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ opportunityId }),
+  });
+
+  assert(payload.data?.executiveSummary, "Proposal draft did not include an executive summary");
+  assert(Array.isArray(payload.data?.complianceMatrix), "Proposal draft did not include a compliance matrix");
+  assert(payload.data?.provider, "Proposal draft did not include provider metadata");
+
+  const notes = await request(`/api/notes?opportunityId=${encodeURIComponent(opportunityId)}&type=proposal_draft`);
+  assert(Array.isArray(notes.data), "Proposal draft notes did not return an array");
+  assert(notes.data.length >= 1, "Proposal draft was not visible in saved notes");
+  console.log(`ok api /api/ai/proposal-draft: ${payload.data.provider}`);
+}
+
+async function checkWorkflowCommandCenter(opportunityId) {
+  const payload = await request("/api/workflows", {
+    headers: { "x-govcon-data-mode": "database" },
+  });
+
+  assert(Array.isArray(payload.data), "Workflow command center did not return workflows");
+  const workflow = payload.data.find((item) => item.opportunity?.id === opportunityId);
+  assert(workflow, "Workflow command center did not include the tested opportunity");
+  assert(Array.isArray(workflow.opportunity.analyses), "Workflow payload did not include analyses");
+  assert(workflow.opportunity.analyses.length >= 1, "Workflow payload did not include latest analysis proof");
+  assert(Array.isArray(workflow.opportunity.supplierQuotes), "Workflow payload did not include supplier quote status");
+  assert(Array.isArray(workflow.opportunity.notes), "Workflow payload did not include proposal draft notes");
+  assert(workflow.opportunity.notes.length >= 1, "Workflow payload did not include saved proposal draft proof");
+  console.log(`ok api /api/workflows: command center proof for ${opportunityId}`);
+}
+
 async function main() {
   console.log(`GovCon demo smoke: ${baseUrl}`);
 
@@ -150,8 +244,39 @@ async function main() {
   await checkProtectedRoute("/ai-analyzer");
   await checkProtectedRoute("/compliance");
   await checkProtectedRoute("/workflows");
+  await checkProtectedApi("GET", "/api/auth");
+  await checkProtectedApi("GET", "/api/dashboard");
+  await checkProtectedApi("GET", "/api/compliance");
+  await checkProtectedApi("GET", "/api/suppliers");
+  await checkProtectedApi("GET", "/api/workflows");
+  await checkProtectedApi("GET", "/api/documents");
+  await checkProtectedApi("GET", "/api/opportunities");
+  await checkProtectedApi("GET", "/api/opportunities/opp-001");
+  await checkProtectedApi("GET", "/api/opportunities/saved");
+  await checkProtectedApi("GET", "/api/opportunities/searches");
+  await checkProtectedApi("GET", "/api/opportunities/search?keyword=office");
+  await checkProtectedApi("GET", "/api/notes");
+  await checkProtectedApi("GET", "/api/documents/download?id=doc-001");
+  await checkProtectedApi("GET", "/api/admin");
+  await checkProtectedApi("POST", "/api/ai/chat", { message: "hello" });
+  await checkProtectedApi("POST", "/api/ai/analyze", { opportunityId: "opp-001" });
+  await checkProtectedApi("POST", "/api/ai/proposal-draft", { opportunityId: "opp-001" });
+  await checkProtectedApi("POST", "/api/opportunities", {});
+  await checkProtectedApi("POST", "/api/opportunities/saved", { opportunityId: "opp-001" });
+  await checkProtectedApi("DELETE", "/api/opportunities/saved?opportunityId=opp-001");
+  await checkProtectedApi("POST", "/api/opportunities/searches", { name: "unauthorized" });
+  await checkProtectedApi("DELETE", "/api/opportunities/searches?id=search-001");
+  await checkProtectedApi("POST", "/api/opportunities/sync", {});
+  await checkProtectedApi("POST", "/api/suppliers", {});
+  await checkProtectedApi("POST", "/api/workflows", {});
+  await checkProtectedApi("PATCH", "/api/workflows", {});
+  await checkProtectedApi("PUT", "/api/compliance", {});
+  await checkProtectedApi("POST", "/api/documents", {});
+  await checkProtectedApi("DELETE", "/api/documents?id=doc-001");
+  await checkLegacyAuthRetired();
 
   await login();
+  await checkComplianceInputBoundary();
   await checkPage("/dashboard", "Dashboard");
   await checkPage("/opportunities", "Opportunity Discovery");
   await checkPage("/suppliers", "Supplier Sourcing");
@@ -159,6 +284,7 @@ async function main() {
   await checkDashboardMetrics();
   await checkSavedSearchSync();
   const opportunities = await checkCollection("/api/opportunities", "opportunities", 8, "database");
+  await checkOpportunityDetail(opportunities[0].id);
   await checkCollection("/api/suppliers", "suppliers", 5, "database");
   await checkCollection("/api/workflows", "workflows", 5, "database");
 
@@ -171,6 +297,9 @@ async function main() {
   assert(analysis.data?.bidRecommendation, "AI analysis did not include a bid recommendation");
   assert(Array.isArray(analysis.data?.recommendedNextSteps), "AI analysis did not include next steps");
   console.log(`ok api /api/ai/analyze: ${analysis.data.bidRecommendation}`);
+
+  await checkProposalDraft(opportunities[0].id);
+  await checkWorkflowCommandCenter(opportunities[0].id);
 
   console.log("GovCon demo smoke passed");
 }
