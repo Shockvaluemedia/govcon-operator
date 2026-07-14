@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 
 const searchSchema = z.object({
   name: z.string().trim().min(1, "name is required").max(80),
@@ -43,12 +44,11 @@ export async function GET() {
 
 // POST /api/opportunities/searches - Create or update a saved search by name
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("saved-searches:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const parsed = searchSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json(
@@ -105,12 +105,11 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/opportunities/searches?id=... - Delete a saved search
 export async function DELETE(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("saved-searches:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const id = request.nextUrl.searchParams.get("id");
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });

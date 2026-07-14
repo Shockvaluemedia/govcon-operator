@@ -8,7 +8,7 @@ on:
 
 jobs:
   demo-smoke:
-    name: Lint, build, and smoke demo
+    name: Lint, test, build, and smoke demo
     runs-on: ubuntu-latest
 
     services:
@@ -60,6 +60,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test authorization policy
+        run: npm test
 
       - name: Prepare demo database
         run: |

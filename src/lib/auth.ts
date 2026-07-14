@@ -9,7 +9,9 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { cookies } from "next/headers";
+import type { Role } from "@prisma/client";
 import prisma from "./prisma";
+import { resolveEffectiveRole } from "./authorization";
 
 // ============================================================
 // AWS Cognito Configuration
@@ -90,9 +92,11 @@ async function authUserFromEmail(email: string): Promise<AuthUser | null> {
     lastName: user.lastName,
     cognitoId: user.cognitoId || `demo-cognito:${user.email}`,
     organizationId: user.organizationId,
-    role:
-      user.userRoles.find((role) => role.organizationId === user.organizationId)
-        ?.role || "viewer",
+    role: resolveEffectiveRole(
+      user.userRoles
+        .filter((role) => role.organizationId === user.organizationId)
+        .map((role) => role.role)
+    ),
   };
 }
 
@@ -114,7 +118,7 @@ export interface AuthUser {
   lastName: string;
   cognitoId: string;
   organizationId: string;
-  role: string;
+  role: Role;
 }
 
 /**
@@ -417,9 +421,11 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
       lastName: user.lastName,
       cognitoId: user.cognitoId!,
       organizationId: user.organizationId,
-      role:
-        user.userRoles.find((role) => role.organizationId === user.organizationId)
-          ?.role || "viewer",
+      role: resolveEffectiveRole(
+        user.userRoles
+          .filter((role) => role.organizationId === user.organizationId)
+          .map((role) => role.role)
+      ),
     };
   } catch (error) {
     console.error("Token verification failed:", error);
@@ -453,14 +459,14 @@ export async function requireAuth(): Promise<AuthUser> {
 /**
  * Check if user has required role
  */
-export function hasRole(user: AuthUser, requiredRoles: string[]): boolean {
+export function hasRole(user: AuthUser, requiredRoles: Role[]): boolean {
   return requiredRoles.includes(user.role);
 }
 
 /**
  * Require specific role(s)
  */
-export async function requireRole(requiredRoles: string[]): Promise<AuthUser> {
+export async function requireRole(requiredRoles: Role[]): Promise<AuthUser> {
   const user = await requireAuth();
   if (!hasRole(user, requiredRoles)) {
     throw new Error("Forbidden: insufficient permissions");

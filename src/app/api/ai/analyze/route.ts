@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeBidRisk } from "@/services/ai-service";
-import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import prisma from "@/lib/prisma";
 import { serializeOpportunity } from "@/lib/opportunities";
 import { mockOpportunities } from "@/data/mock-opportunities";
@@ -8,10 +8,9 @@ import type { Opportunity } from "@/types";
 
 // POST /api/ai/analyze - Run AI analysis on an opportunity
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authorization = await authorizeApiAction("ai:execute");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
   const body = await request.json();
   const { opportunityId, text } = body;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import { getUploadPresignedUrl, generateDocumentKey } from "@/services/s3-service";
 import type { Prisma } from "@prisma/client";
 
@@ -38,12 +39,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/documents - Request upload URL and create document record
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("documents:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const body = await request.json();
     const { filename, contentType, size, type, opportunityId } = body;
 
@@ -148,12 +148,11 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/documents - Delete a document
 export async function DELETE(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("documents:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const { searchParams } = new URL(request.url);
     const documentId = searchParams.get("id");
 

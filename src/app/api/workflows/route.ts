@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
+import { hasOrganizationAccess } from "@/lib/authorization";
 import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
 import { mockWorkflows } from "@/data/mock-workflows";
 import type { Prisma } from "@prisma/client";
@@ -67,6 +69,22 @@ function workflowInclude(organizationId: string): Prisma.BidWorkflowInclude {
   };
 }
 
+async function isOrganizationAssignee(
+  assignedTo: string | null | undefined,
+  organizationId: string
+): Promise<boolean> {
+  if (!assignedTo) return true;
+
+  const assignee = await prisma.user.findUnique({
+    where: { id: assignedTo },
+    select: { organizationId: true },
+  });
+
+  return Boolean(
+    assignee && hasOrganizationAccess(organizationId, assignee.organizationId)
+  );
+}
+
 // GET /api/workflows - List bid workflows
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -122,13 +140,19 @@ export async function GET(request: NextRequest) {
 
 // POST /api/workflows - Create a new bid workflow
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("workflows:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const body = createWorkflowSchema.parse(await request.json());
+
+    if (!(await isOrganizationAssignee(body.assignedTo, user.organizationId))) {
+      return NextResponse.json(
+        { error: "Assigned user is outside your organization", code: "CROSS_ORGANIZATION_ASSIGNMENT" },
+        { status: 403 }
+      );
+    }
 
     const workflow = await prisma.bidWorkflow.create({
       data: {
@@ -172,14 +196,20 @@ export async function POST(request: NextRequest) {
 
 // PATCH /api/workflows - Update workflow (stage, priority, etc.)
 export async function PATCH(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("workflows:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const body = updateWorkflowSchema.parse(await request.json());
     const { id, stage, priority, notes, assignedTo } = body;
+
+    if (!(await isOrganizationAssignee(assignedTo, user.organizationId))) {
+      return NextResponse.json(
+        { error: "Assigned user is outside your organization", code: "CROSS_ORGANIZATION_ASSIGNMENT" },
+        { status: 403 }
+      );
+    }
 
     const existingWorkflow = await prisma.bidWorkflow.findFirst({
       where: {

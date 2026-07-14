@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isSAMConfigured, searchSAMOpportunities } from "@/services/integrations/sam-gov";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import { buildOrganizationProfile, scoreOpportunities } from "@/services/matching-engine";
 import type { Opportunity } from "@/types";
 import type { Prisma } from "@prisma/client";
@@ -32,12 +32,11 @@ function asJson(value: Opportunity): Prisma.InputJsonValue {
 
 // POST /api/opportunities/sync - Sync opportunities from SAM.gov into database
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("opportunities:sync");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const parsed = syncSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json(

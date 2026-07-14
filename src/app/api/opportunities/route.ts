@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
 import { mockOpportunities } from "@/data/mock-opportunities";
 import { scoreOpportunities, buildOrganizationProfile } from "@/services/matching-engine";
@@ -138,12 +139,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/opportunities - Save/import an opportunity
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("opportunities:import");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const body = await request.json();
 
     const opportunity = await prisma.opportunity.create({

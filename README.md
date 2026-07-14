@@ -75,14 +75,14 @@ The app supports a seeded local pilot mode. Set `GOVCON_DEMO_AUTH=true`, run the
 
 For production, set `GOVCON_DEMO_AUTH=false` and `GOVCON_STRICT_DATA=true`, then provide real Cognito, PostgreSQL, S3, AI, and SAM.gov configuration. The Cognito flow currently expects an app client without a client secret.
 
-The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` runs lint, prepares a seeded PostgreSQL database, builds the app, starts Next.js, and executes the authenticated demo smoke.
+The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` runs lint and authorization-policy tests, prepares a seeded PostgreSQL database, builds the app, starts Next.js, and executes the authenticated demo smoke.
 
 Known MVP gaps:
 - Visual polish still needs a full `DESIGN.md` token pass across the dashboard and auth surfaces.
 - Production Cognito, S3, AI, and SAM.gov modes require real environment configuration.
 - SAM.gov saved searches run in no-key mode locally; add `SAM_GOV_API_KEY` for live solicitation imports.
 - Proposal drafts are generated, persisted as opportunity notes, and exportable as Markdown; DOCX/PDF export is not built yet.
-- Production is Constitution `NO-GO` until AWS infrastructure, migrations, recovery, observability, server-side role enforcement, AI data governance, and live deployment evidence exist. See [the current Constitution audit](docs/constitution-audit-2026-07-14.md).
+- Production is Constitution `NO-GO` until AWS infrastructure, migrations, recovery, observability, rate limits, AI data governance, and live deployment evidence exist. See [the current Constitution audit](docs/constitution-audit-2026-07-14.md).
 
 ## Features
 
@@ -102,18 +102,20 @@ Known MVP gaps:
 | AI Assistant Chat | Mock/default mode; live LLM requires provider configuration |
 | Admin Dashboard | Role-gated API and demo-ready UI |
 | Settings | Demo-ready |
-| API Routes | Demo-ready; production hardening in progress |
+| API Routes | Verified sessions plus server-side product-action roles; production hardening remains in progress |
 | Database Schema | ✅ Prisma schema + seeded local pilot data |
 | AI Service Abstraction | Mock/OpenAI/Bedrock provider layer |
 | Integration Adapters | Adapter scaffolding; live keys required |
 
 ## User Roles
 
-- **Owner** - Full platform access, billing, organization management
-- **Admin** - User management, all features
-- **Operator** - Core workflow features, opportunity management
-- **Coach** - Read access, can add notes and recommendations
-- **Viewer** - Read-only access
+- **Owner** - Full organization and administrative authority
+- **Admin** - Full delegated organization and administrative authority
+- **Operator** - Day-to-day opportunity, supplier, compliance, document, and workflow operations
+- **Coach** - Authenticated read access, AI assistance, and personal opportunity/search curation
+- **Viewer** - Authenticated read-only access
+
+The server-enforced endpoint matrix and tenant rules are documented in [the API authorization policy](docs/api-authorization-policy.md).
 
 ## API Endpoints
 

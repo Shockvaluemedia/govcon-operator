@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 
 // GET /api/admin - Get admin dashboard data
 export async function GET() {
-  try {
-    await requireRole(["owner", "admin"]);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unauthorized";
-    return NextResponse.json(
-      { error: message },
-      { status: message.startsWith("Forbidden") ? 403 : 401 }
-    );
-  }
+  const authorization = await authorizeApiAction("admin:read");
+  if (!authorization.ok) return authorization.response;
 
   const adminData = {
     users: {
