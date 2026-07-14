@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzeBidRisk } from "@/services/ai-service";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { serializeOpportunity } from "@/lib/opportunities";
 import { mockOpportunities } from "@/data/mock-opportunities";
 import type { Opportunity } from "@/types";
 
 // POST /api/ai/analyze - Run AI analysis on an opportunity
 export async function POST(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const { opportunityId, text } = body;
 
@@ -27,28 +33,7 @@ export async function POST(request: NextRequest) {
           where: { id: opportunityId },
         });
         if (dbOpp) {
-          opportunity = {
-            id: dbOpp.id,
-            title: dbOpp.title,
-            agency: dbOpp.agency,
-            solicitationNumber: dbOpp.solicitationNumber,
-            naicsCode: dbOpp.naicsCode,
-            pscCode: dbOpp.pscCode,
-            setAsideType: dbOpp.setAsideType,
-            dueDate: dbOpp.dueDate.toISOString(),
-            estimatedValue: Number(dbOpp.estimatedValue),
-            source: dbOpp.source as Opportunity["source"],
-            status: dbOpp.status as Opportunity["status"],
-            matchScore: dbOpp.matchScore || 50,
-            riskScore: dbOpp.riskScore || 50,
-            description: dbOpp.description || "",
-            requirements: dbOpp.requirements,
-            deliveryRequirements: dbOpp.deliveryRequirements || undefined,
-            placeOfPerformance: dbOpp.placeOfPerformance || undefined,
-            pointOfContact: dbOpp.pointOfContact || undefined,
-            postedDate: dbOpp.postedDate.toISOString(),
-            responseDate: dbOpp.responseDate.toISOString(),
-          };
+          opportunity = serializeOpportunity(dbOpp);
         }
       } catch {
         // Database unavailable, try mock
@@ -88,10 +73,9 @@ export async function POST(request: NextRequest) {
     // Run AI analysis
     const analysis = await analyzeBidRisk(opportunity);
 
-    // Save analysis to database if user is authenticated
+    // Save analysis to database when it belongs to a persisted opportunity.
     try {
-      const user = await getCurrentUser();
-      if (user && opportunityId) {
+      if (opportunityId) {
         await prisma.opportunityAnalysis.create({
           data: {
             opportunityId: opportunity.id,

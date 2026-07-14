@@ -9,10 +9,13 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const type = searchParams.get("type");
   const opportunityId = searchParams.get("opportunityId");
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
-    const user = await getCurrentUser();
-
     if (user) {
       const where: Prisma.DocumentWhereInput = { organizationId: user.organizationId };
       if (type) where.type = type;
@@ -26,15 +29,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: documents });
     }
 
-    // Fallback mock documents
-    return NextResponse.json({
-      data: [
-        { id: "doc-001", name: "Business License - State of Virginia.pdf", type: "business_license", url: "#", size: 245000, createdAt: "2026-04-15T00:00:00Z" },
-        { id: "doc-002", name: "General Liability Insurance Certificate.pdf", type: "insurance", url: "#", size: 189000, createdAt: "2026-03-20T00:00:00Z" },
-        { id: "doc-003", name: "SAM.gov Registration Confirmation.pdf", type: "certification", url: "#", size: 156000, createdAt: "2026-02-10T00:00:00Z" },
-      ],
-      meta: { source: "mock" },
-    });
+    return NextResponse.json({ data: [] });
   } catch (error) {
     console.warn("Documents fetch error:", error);
     return NextResponse.json({ data: [], meta: { source: "error" } });

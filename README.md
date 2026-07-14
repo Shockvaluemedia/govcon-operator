@@ -9,7 +9,7 @@ AI-powered government contracting platform for small businesses. Discover opport
 - **Database**: PostgreSQL (Prisma ORM, AWS RDS-ready)
 - **Auth**: Seeded demo auth in development; AWS Cognito for production
 - **Storage**: AWS S3 (mock in development)
-- **AI**: OpenAI / AWS Bedrock abstraction layer (mock in development)
+- **AI**: Mock default with OpenAI live path; Bedrock-ready provider seam
 - **Integrations**: SAM.gov, DLA, FPDS, USAspending adapters
 
 ## Getting Started
@@ -71,17 +71,18 @@ prisma/
 
 ## Readiness
 
-The app supports a seeded local pilot mode. Set `GOVCON_DEMO_AUTH=true`, run the database setup commands above, then sign in as `demo@govcon-operator.com` with any non-empty password.
+The app supports a seeded local pilot mode. Set `GOVCON_DEMO_AUTH=true`, run the database setup commands above, then sign in as `demo@govcon-operator.com` with any non-empty password. The test-only `GOVCON_DEMO_AUTH_ALLOW_PRODUCTION_BUILD=true` flag is required when a CI or local proof runs the optimized build with `next start`; never enable it on a public deployment.
 
-For production, set `GOVCON_DEMO_AUTH=false` and provide real Cognito, PostgreSQL, S3, AI, and SAM.gov configuration.
+For production, set `GOVCON_DEMO_AUTH=false` and `GOVCON_STRICT_DATA=true`, then provide real Cognito, PostgreSQL, S3, AI, and SAM.gov configuration. The Cognito flow currently expects an app client without a client secret.
 
 The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` runs lint, prepares a seeded PostgreSQL database, builds the app, starts Next.js, and executes the authenticated demo smoke.
 
 Known MVP gaps:
 - Visual polish still needs a full `DESIGN.md` token pass across the dashboard and auth surfaces.
 - Production Cognito, S3, AI, and SAM.gov modes require real environment configuration.
-- Dashboard headline metrics are database-backed; some secondary dashboard panels still use seeded/demo content.
 - SAM.gov saved searches run in no-key mode locally; add `SAM_GOV_API_KEY` for live solicitation imports.
+- Proposal drafts are generated, persisted as opportunity notes, and exportable as Markdown; DOCX/PDF export is not built yet.
+- Production is Constitution `NO-GO` until AWS infrastructure, migrations, recovery, observability, server-side role enforcement, AI data governance, and live deployment evidence exist. See [the current Constitution audit](docs/constitution-audit-2026-07-14.md).
 
 ## Features
 
@@ -89,14 +90,14 @@ Known MVP gaps:
 |---------|--------|
 | Landing Page | Demo-ready |
 | Auth Pages | Local demo login/register wired to API; Cognito path available for production |
-| Main Dashboard | Database-backed headline metrics; secondary panels still demo content |
+| Main Dashboard | Database-backed metrics, risks, due tasks, supplier quotes, and compliance summary |
 | Opportunity Discovery | Database-backed catalog, saved searches, and SAM.gov sync trigger; live imports require `SAM_GOV_API_KEY` |
-| Opportunity Detail | Demo-ready |
-| AI Bid Analyzer | Provider abstraction with mock default; OpenAI/Bedrock require keys |
+| Opportunity Detail | Database-backed detail with AI analysis, saved proposal drafts, and Markdown export |
+| AI Bid Analyzer | Provider abstraction with mock default; OpenAI requires keys |
 | Supplier Sourcing | Database-backed list/create flow with seeded quotes |
 | Margin Calculator | Demo-ready calculator UI |
 | Compliance Readiness | Demo-ready profile and checklist |
-| Bid Workflow Board | Database-backed board with stage updates |
+| Bid Workflow Board | Database-backed command board with stage updates, AI proof, quote status, draft status, and next actions |
 | Document Center | Demo UI and S3 adapter; production storage requires configuration |
 | AI Assistant Chat | Mock/default mode; live LLM requires provider configuration |
 | Admin Dashboard | Role-gated API and demo-ready UI |
@@ -118,16 +119,23 @@ Known MVP gaps:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | /api/auth | Get current session user |
-| POST | /api/auth | Login |
+| GET | /api/auth | Legacy authenticated session check |
+| POST | /api/auth/login | Login and set HTTP-only session cookies |
 | GET | /api/opportunities | List opportunities with filters |
+| GET | /api/opportunities/[id] | Get opportunity detail |
 | POST | /api/opportunities | Create/import opportunity |
+| GET | /api/opportunities/searches | List saved SAM.gov searches |
+| POST | /api/opportunities/searches | Create or update saved search |
+| DELETE | /api/opportunities/searches | Delete saved search |
+| POST | /api/opportunities/sync | Sync opportunities from SAM.gov |
 | POST | /api/ai/analyze | Run AI bid analysis |
+| POST | /api/ai/proposal-draft | Generate first-pass proposal draft |
+| GET | /api/notes | List organization-visible notes and saved proposal drafts |
 | GET | /api/suppliers | List suppliers |
 | POST | /api/suppliers | Create supplier |
 | GET | /api/compliance | Get compliance profile |
 | PUT | /api/compliance | Update compliance profile |
-| GET | /api/workflows | List workflows |
+| GET | /api/workflows | List workflows with task, analysis, quote, and proposal-draft proof |
 | POST | /api/workflows | Create workflow |
 | PATCH | /api/workflows | Update workflow stage |
 | GET | /api/documents | List documents |
@@ -146,10 +154,10 @@ The AI service supports multiple providers through an abstraction layer:
 AI Functions:
 - `summarizeOpportunity()` - Plain-language opportunity summary
 - `analyzeBidRisk()` - Full bid/no-bid analysis
+- `generateProposalDraft()` - First-pass proposal response draft
 - `generateBidNoBidRecommendation()` - Quick recommendation
 - `extractComplianceRequirements()` - Extract requirements from text
 - `generateSupplierQuestions()` - Questions to ask suppliers
-- `calculateOpportunityFit()` - Match scoring
 - `explainGovConTerm()` - Term definitions
 - `generateNextSteps()` - Stage-appropriate next actions
 - `summarizeUploadedDocument()` - Document summarization

@@ -29,6 +29,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/govcon_operator
       GOVCON_DEMO_AUTH: "true"
+      GOVCON_DEMO_AUTH_ALLOW_PRODUCTION_BUILD: "true"
+      GOVCON_STRICT_DATA: "true"
       AI_PROVIDER: mock
       AWS_REGION: us-east-1
 
@@ -50,6 +52,8 @@ jobs:
           cat > .env.local <<'EOF'
           DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/govcon_operator
           GOVCON_DEMO_AUTH=true
+          GOVCON_DEMO_AUTH_ALLOW_PRODUCTION_BUILD=true
+          GOVCON_STRICT_DATA=true
           AI_PROVIDER=mock
           AWS_REGION=us-east-1
           EOF

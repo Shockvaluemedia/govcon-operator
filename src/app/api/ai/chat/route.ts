@@ -6,6 +6,11 @@ import { v4 as uuidv4 } from "uuid";
 
 // POST /api/ai/chat - Send message to AI assistant
 export async function POST(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const { message, sessionId } = body;
 
@@ -18,33 +23,27 @@ export async function POST(request: NextRequest) {
   try {
     // Get user context for personalized responses
     let context: Record<string, unknown> = {};
-    let userId = "anonymous";
+    const userId = user.id;
 
     try {
-      const user = await getCurrentUser();
-      if (user) {
-        userId = user.id;
+      const [complianceProfile, savedOpps, workflows] = await Promise.all([
+        prisma.complianceProfile.findUnique({
+          where: { organizationId: user.organizationId },
+        }).catch(() => null),
+        prisma.savedOpportunity.count({
+          where: { userId: user.id },
+        }).catch(() => 0),
+        prisma.bidWorkflow.count({
+          where: { organizationId: user.organizationId },
+        }).catch(() => 0),
+      ]);
 
-        // Build context from user's data
-        const [complianceProfile, savedOpps, workflows] = await Promise.all([
-          prisma.complianceProfile.findUnique({
-            where: { organizationId: user.organizationId },
-          }).catch(() => null),
-          prisma.savedOpportunity.count({
-            where: { userId: user.id },
-          }).catch(() => 0),
-          prisma.bidWorkflow.count({
-            where: { organizationId: user.organizationId },
-          }).catch(() => 0),
-        ]);
-
-        context = {
-          complianceScore: complianceProfile?.readinessScore || 0,
-          savedOpportunities: savedOpps,
-          activeWorkflows: workflows,
-          role: user.role,
-        };
-      }
+      context = {
+        complianceScore: complianceProfile?.readinessScore || 0,
+        savedOpportunities: savedOpps,
+        activeWorkflows: workflows,
+        role: user.role,
+      };
     } catch {
       // Continue without user context
     }
@@ -54,24 +53,22 @@ export async function POST(request: NextRequest) {
 
     // Save messages to database
     try {
-      if (userId !== "anonymous") {
-        await prisma.aIMessage.createMany({
-          data: [
-            {
-              role: "user",
-              content: message,
-              userId,
-              sessionId: currentSessionId,
-            },
-            {
-              role: "assistant",
-              content: response,
-              userId,
-              sessionId: currentSessionId,
-            },
-          ],
-        });
-      }
+      await prisma.aIMessage.createMany({
+        data: [
+          {
+            role: "user",
+            content: message,
+            userId,
+            sessionId: currentSessionId,
+          },
+          {
+            role: "assistant",
+            content: response,
+            userId,
+            sessionId: currentSessionId,
+          },
+        ],
+      });
     } catch {
       // Don't fail if message save fails
     }

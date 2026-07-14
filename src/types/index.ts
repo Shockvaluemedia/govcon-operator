@@ -99,6 +99,30 @@ export interface OpportunityAnalysis {
   createdAt: string;
 }
 
+export interface ProposalDraft {
+  id: string;
+  opportunityId: string;
+  title: string;
+  executiveSummary: string;
+  technicalApproach: string[];
+  complianceMatrix: ProposalComplianceItem[];
+  pastPerformancePrompts: string[];
+  pricingStrategy: string[];
+  riskMitigations: string[];
+  clarifyingQuestions: string[];
+  nextActions: string[];
+  generatedAt: string;
+  provider: string;
+  model: string;
+}
+
+export interface ProposalComplianceItem {
+  requirement: string;
+  response: string;
+  owner: string;
+  status: "ready" | "needs_input" | "gap";
+}
+
 export interface Supplier {
   id: string;
   name: string;
@@ -258,6 +282,42 @@ export interface DashboardMetrics {
   tasksDue: number;
   pendingQuotes: number;
   recommendedActions: string[];
+  highRiskItems?: DashboardRiskItem[];
+  taskItems?: DashboardTaskItem[];
+  quoteItems?: DashboardQuoteItem[];
+  complianceSummary?: DashboardComplianceSummary;
+}
+
+export interface DashboardRiskItem {
+  id: string;
+  title: string;
+  riskScore: number;
+  reason: string;
+  dueDate: string;
+}
+
+export interface DashboardTaskItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: "low" | "medium" | "high" | "critical";
+  dueDate?: string;
+  opportunityTitle?: string;
+}
+
+export interface DashboardQuoteItem {
+  id: string;
+  supplierName: string;
+  productDescription: string;
+  status: string;
+  totalPrice: number;
+}
+
+export interface DashboardComplianceSummary {
+  completed: number;
+  missing: number;
+  total: number;
+  missingItems: string[];
 }
 
 export interface AuditLog {

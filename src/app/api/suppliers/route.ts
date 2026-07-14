@@ -39,10 +39,13 @@ export async function GET(request: NextRequest) {
   const databaseRequired = requiresDatabase(request);
   const category = searchParams.get("category");
   const search = searchParams.get("search");
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
-    const user = await getCurrentUser();
-
     if (user) {
       const where: Prisma.SupplierWhereInput = { organizationId: user.organizationId };
 
@@ -67,8 +70,6 @@ export async function GET(request: NextRequest) {
       if (databaseRequired) {
         return NextResponse.json({ data: [], meta: databaseMeta(0) });
       }
-    } else if (databaseRequired) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Fallback to mock data

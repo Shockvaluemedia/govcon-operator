@@ -39,16 +39,47 @@ const updateWorkflowSchema = z.object({
   assignedTo: z.string().min(1).optional().nullable(),
 });
 
+function workflowInclude(organizationId: string): Prisma.BidWorkflowInclude {
+  return {
+    tasks: true,
+    opportunity: {
+      include: {
+        analyses: {
+          where: { user: { organizationId } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        supplierQuotes: {
+          where: { supplier: { organizationId } },
+          include: { supplier: true },
+          orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+        },
+        notes: {
+          where: {
+            user: { organizationId },
+            content: { contains: "## Compliance Matrix" },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        },
+      },
+    },
+  };
+}
+
 // GET /api/workflows - List bid workflows
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const databaseRequired = requiresDatabase(request);
   const stage = searchParams.get("stage");
   const priority = searchParams.get("priority");
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
-    const user = await getCurrentUser();
-
     if (user) {
       const where: Prisma.BidWorkflowWhereInput = { organizationId: user.organizationId };
       if (stage) where.stage = stage;
@@ -56,10 +87,7 @@ export async function GET(request: NextRequest) {
 
       const workflows = await prisma.bidWorkflow.findMany({
         where,
-        include: {
-          opportunity: true,
-          tasks: true,
-        },
+        include: workflowInclude(user.organizationId),
         orderBy: { updatedAt: "desc" },
       });
 
@@ -70,8 +98,6 @@ export async function GET(request: NextRequest) {
       if (databaseRequired) {
         return NextResponse.json({ data: [], meta: databaseMeta(0) });
       }
-    } else if (databaseRequired) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Fallback to mock
@@ -114,7 +140,7 @@ export async function POST(request: NextRequest) {
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
         notes: body.notes,
       },
-      include: { opportunity: true, tasks: true },
+      include: workflowInclude(user.organizationId),
     });
 
     await prisma.auditLog.create({
@@ -174,7 +200,7 @@ export async function PATCH(request: NextRequest) {
         ...(notes !== undefined && { notes }),
         ...(assignedTo !== undefined && { assignedTo }),
       },
-      include: { opportunity: true, tasks: true },
+      include: workflowInclude(user.organizationId),
     });
 
     await prisma.auditLog.create({

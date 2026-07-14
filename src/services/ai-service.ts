@@ -4,7 +4,7 @@
 // ============================================================
 
 import OpenAI from "openai";
-import { Opportunity, OpportunityAnalysis } from "@/types";
+import { Opportunity, OpportunityAnalysis, ProposalDraft } from "@/types";
 
 export type AIProvider = "openai" | "bedrock" | "mock";
 
@@ -126,6 +126,81 @@ Be specific and actionable. Consider the small business perspective.`,
     };
   } catch {
     return mockAnalysis(opportunity);
+  }
+}
+
+export async function generateProposalDraft(
+  opportunity: Opportunity,
+  context?: {
+    organizationName?: string;
+    complianceScore?: number;
+    certifications?: string[];
+    setAsideEligibility?: string[];
+  }
+): Promise<ProposalDraft> {
+  const config = getConfig();
+
+  if (config.provider === "mock") {
+    return mockProposalDraft(opportunity, context, config);
+  }
+
+  const openai = getOpenAIClient();
+  const response = await openai.chat.completions.create({
+    model: config.model || "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: `You are a senior government proposal manager. Draft a first-pass, human-review proposal response for a small business.
+Return a JSON object with this shape:
+{
+  "title": "draft title",
+  "executiveSummary": "buyer-focused summary",
+  "technicalApproach": ["specific approach bullets"],
+  "complianceMatrix": [
+    { "requirement": "requirement", "response": "how to satisfy it", "owner": "role", "status": "ready" | "needs_input" | "gap" }
+  ],
+  "pastPerformancePrompts": ["specific evidence to gather"],
+  "pricingStrategy": ["pricing and margin notes"],
+  "riskMitigations": ["risk mitigation bullets"],
+  "clarifyingQuestions": ["questions for contracting officer"],
+  "nextActions": ["ordered next actions"]
+}
+Keep it practical. Do not invent certifications, past performance, or pricing facts. Mark unknowns as needs_input or gap.`,
+      },
+      {
+        role: "user",
+        content: `Opportunity:
+Title: ${opportunity.title}
+Agency: ${opportunity.agency}
+Solicitation: ${opportunity.solicitationNumber}
+NAICS: ${opportunity.naicsCode}
+PSC: ${opportunity.pscCode}
+Set-Aside: ${opportunity.setAsideType}
+Estimated Value: $${opportunity.estimatedValue.toLocaleString()}
+Due Date: ${opportunity.dueDate}
+Description: ${opportunity.description}
+Requirements:
+- ${opportunity.requirements.join("\n- ")}
+Delivery: ${opportunity.deliveryRequirements || "Not specified"}
+Place of Performance: ${opportunity.placeOfPerformance || "Not specified"}
+
+Organization context:
+Name: ${context?.organizationName || "Unknown"}
+Compliance Score: ${context?.complianceScore ?? "Unknown"}
+Certifications: ${(context?.certifications || []).join(", ") || "Unknown"}
+Set-Aside Eligibility: ${(context?.setAsideEligibility || []).join(", ") || "Unknown"}`,
+      },
+    ],
+    temperature: 0.35,
+    max_tokens: 2200,
+    response_format: { type: "json_object" },
+  });
+
+  try {
+    const parsed = JSON.parse(response.choices[0].message.content || "{}");
+    return normalizeProposalDraft(parsed, opportunity, config);
+  } catch {
+    return mockProposalDraft(opportunity, context, config);
   }
 }
 
@@ -458,6 +533,136 @@ function mockAnalysis(opportunity: Opportunity): OpportunityAnalysis {
   };
 }
 
+function normalizeProposalDraft(
+  parsed: Partial<ProposalDraft>,
+  opportunity: Opportunity,
+  config: AIServiceConfig
+): ProposalDraft {
+  return {
+    id: `proposal-draft-${Date.now()}`,
+    opportunityId: opportunity.id,
+    title: parsed.title || `${opportunity.title} - Proposal Draft`,
+    executiveSummary: parsed.executiveSummary || mockSummarize(opportunity),
+    technicalApproach: arrayOrFallback(parsed.technicalApproach, [
+      "Confirm scope, delivery locations, and acceptance criteria against the full solicitation.",
+      "Align supplier commitments, quality controls, and delivery milestones before final pricing.",
+    ]),
+    complianceMatrix: Array.isArray(parsed.complianceMatrix)
+      ? parsed.complianceMatrix.map((item) => ({
+          requirement: item.requirement || "Requirement review needed",
+          response: item.response || "Add response after solicitation review",
+          owner: item.owner || "Proposal lead",
+          status: ["ready", "needs_input", "gap"].includes(item.status)
+            ? item.status
+            : "needs_input",
+        }))
+      : [],
+    pastPerformancePrompts: arrayOrFallback(parsed.pastPerformancePrompts, [
+      "Identify one recent project with similar product category, volume, or delivery complexity.",
+    ]),
+    pricingStrategy: arrayOrFallback(parsed.pricingStrategy, [
+      "Build price from supplier quotes, shipping, financing cost, contingency, and target margin.",
+    ]),
+    riskMitigations: arrayOrFallback(parsed.riskMitigations, [
+      "Use backup suppliers and an internal deadline ahead of the government response date.",
+    ]),
+    clarifyingQuestions: arrayOrFallback(parsed.clarifyingQuestions, [
+      "Are equivalent products acceptable where brand names or specifications are referenced?",
+    ]),
+    nextActions: arrayOrFallback(parsed.nextActions, [
+      "Review the full solicitation",
+      "Request supplier quotes",
+      "Fill proposal gaps marked needs_input",
+    ]),
+    generatedAt: new Date().toISOString(),
+    provider: config.provider,
+    model: config.model || "mock",
+  };
+}
+
+function mockProposalDraft(
+  opportunity: Opportunity,
+  context: {
+    organizationName?: string;
+    complianceScore?: number;
+    certifications?: string[];
+    setAsideEligibility?: string[];
+  } | undefined,
+  config: AIServiceConfig
+): ProposalDraft {
+  const organizationName = context?.organizationName || "Your company";
+  const complianceReady = (context?.complianceScore || 0) >= 75;
+
+  return {
+    id: `proposal-draft-${Date.now()}`,
+    opportunityId: opportunity.id,
+    title: `${opportunity.title} - Response Draft`,
+    executiveSummary: `${organizationName} can support ${opportunity.agency} with a controlled, compliance-forward response for ${opportunity.title.toLowerCase()}. The proposed approach prioritizes solicitation compliance, supplier confirmation, delivery discipline, and clear quality controls before final bid submission.`,
+    technicalApproach: [
+      `Confirm the full scope against solicitation ${opportunity.solicitationNumber} and map each requirement to an owner before final pricing.`,
+      `Source compliant products for ${opportunity.productCategory || "the required category"} from qualified suppliers with documented lead times and backup capacity.`,
+      `Use a delivery plan aligned to ${opportunity.deliveryRequirements || "the stated delivery requirements"} with internal checkpoints before the government due date.`,
+      "Package compliance evidence, supplier quotes, and acceptance criteria into a review-ready proposal file.",
+    ],
+    complianceMatrix: opportunity.requirements.slice(0, 8).map((requirement) => ({
+      requirement,
+      response: complianceReady
+        ? "Ready for proposal response; attach current evidence before submission."
+        : "Needs supporting evidence before final proposal submission.",
+      owner: requirement.toLowerCase().includes("delivery")
+        ? "Operations"
+        : requirement.toLowerCase().includes("supplier")
+          ? "Sourcing"
+          : "Compliance lead",
+      status: complianceReady ? "ready" : "needs_input",
+    })),
+    pastPerformancePrompts: [
+      `Find a past order or project involving ${opportunity.productCategory || opportunity.naicsCode}.`,
+      "Capture customer, period of performance, value, delivery scope, and measurable outcome.",
+      "Use commercial work if federal past performance is not available, but label it clearly.",
+    ],
+    pricingStrategy: [
+      `Start with supplier quotes against the ${formatValue(opportunity.estimatedValue)} estimated value.`,
+      "Include freight, packaging, financing cost, quality checks, platform/admin overhead, and contingency.",
+      "Run a no-bid threshold if gross margin falls below the organization's target after payment delay.",
+    ],
+    riskMitigations: [
+      "Set an internal proposal deadline at least five business days before the response date.",
+      "Request backup supplier quotes for any single-source or long-lead item.",
+      "Create a compliance evidence checklist and block submission until every required item is attached.",
+    ],
+    clarifyingQuestions: [
+      "Are equivalent products acceptable where specifications reference brands or standards?",
+      "What evaluation weight is assigned to price versus technical approach?",
+      "Are partial shipments, substitutions, or delivery schedule adjustments allowed?",
+    ],
+    nextActions: [
+      "Download and review the full solicitation package.",
+      "Assign owners for compliance, sourcing, pricing, and proposal review.",
+      "Request supplier quotes within 48 hours.",
+      "Draft the technical approach and attach evidence for every compliance requirement.",
+      "Run final margin and risk review before bid/no-bid approval.",
+    ],
+    generatedAt: new Date().toISOString(),
+    provider: config.provider,
+    model: config.model || "mock",
+  };
+}
+
+function arrayOrFallback(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : fallback;
+}
+
+function formatValue(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function mockChat(message: string): string {
   const lowerMessage = message.toLowerCase();
 
@@ -488,6 +693,7 @@ function mockChat(message: string): string {
 export const aiService = {
   summarizeOpportunity,
   analyzeBidRisk,
+  generateProposalDraft,
   generateBidNoBidRecommendation,
   extractComplianceRequirements,
   generateSupplierQuestions,
