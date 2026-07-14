@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import { serializeOpportunity } from "@/lib/opportunities";
 import { generateProposalDraft } from "@/services/ai-service";
 import { mockOpportunities } from "@/data/mock-opportunities";
@@ -13,12 +13,11 @@ const proposalDraftSchema = z.object({
 
 // POST /api/ai/proposal-draft - Generate a first-pass proposal draft
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("ai:execute");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const parsed = proposalDraftSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json(

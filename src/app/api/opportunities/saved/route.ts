@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 
 // GET /api/opportunities/saved - List saved opportunities
 export async function GET() {
@@ -25,12 +26,11 @@ export async function GET() {
 
 // POST /api/opportunities/saved - Save an opportunity
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("opportunities:save");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const body = await request.json();
     const { opportunityId, notes } = body;
 
@@ -84,12 +84,11 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/opportunities/saved - Unsave an opportunity
 export async function DELETE(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("opportunities:save");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const { searchParams } = new URL(request.url);
     const opportunityId = searchParams.get("opportunityId");
 

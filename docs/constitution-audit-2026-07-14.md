@@ -9,7 +9,7 @@ Constitution baseline: v0.2.0
 ## Verdict
 
 - Seeded local demo: `GO` for an owner-controlled walkthrough using the documented strict database proof configuration.
-- Controlled external pilot: `NO-GO` until role authorization, data/AI boundaries, migration/recovery, and operating controls are closed or explicitly excepted.
+- Controlled external pilot: `NO-GO` until data/AI boundaries, migration/recovery, and operating controls are closed or explicitly excepted.
 - Production release: `NO-GO`.
 - Constitution status: `ADOPTED — OPERATIONAL VALIDATION PENDING`. A merged instruction file proves initial adoption, not recurring conformance.
 
@@ -31,15 +31,15 @@ No exceptions are approved. This audit does not authorize merge, deployment, or 
 | --- | --- | --- |
 | Owner and product | A coherent operator loop exists from opportunity discovery through analysis, suppliers, workflow proof, and saved proposal drafts. No real pilot usage, retention, willingness-to-pay, or revenue evidence is recorded. | Demo value plausible; market proof absent. |
 | AWS architecture | Cognito, RDS, S3, SAM.gov, and AI seams exist in code. There is no production IaC, account/region/environment target, deployment workflow, health endpoint, alarms, budgets, or vendor-exit record. | Production blocker. |
-| Security, privacy, tenancy | Tenant filters exist on major organization-owned records. Anonymous probes reproduced access to protected data/AI routes; the bounded remediation closes this and retires legacy mock-cookie login. Role-based write authorization and rate limits remain absent. | Immediate blocker partly remediated; production remains no-go. |
+| Security, privacy, tenancy | Tenant filters exist on major organization-owned records. Anonymous probes reproduced access to protected data/AI routes; the bounded remediation closes this and retires legacy mock-cookie login. A centralized product-action role matrix now protects shared mutations and admin reads, with deterministic role resolution and cross-organization workflow-assignee denial. Rate limits remain absent. | Immediate auth and role blockers remediated; production remains no-go. |
 | UI and accessibility | Primary routes are understandable, responsive, and keyboard-addressable at a basic level. The palette/radius still conflict with `DESIGN.md`; sortable cards expose nested button semantics; mobile search text clips; loading/error/permission recovery is inconsistent. | Near-term remediation. No WCAG conformance claim. |
-| Engineering and operations | Lint, build, seeded DB setup, audit-log writes, and authenticated smoke exist. There are no migration files, structured production telemetry, alert ownership, incident/runbook set, restore test, or exact-change CI result for this working tree. | Demo-ready engineering; production blocker. |
+| Engineering and operations | Lint, policy tests, build, seeded DB setup, audit-log writes, and authenticated smoke exist. There are no migration files, structured production telemetry, alert ownership, incident/runbook set, or restore test. Exact-change CI remains a merge gate for every follow-up. | Demo-ready engineering; production blocker. |
 | Market impact | The strongest wedge is a recurring saved-search-to-bid-command loop. The app has shipped capability but no observed customer action or commercial proof. | Run a measured pilot before feature expansion. |
 
 ## Immediate safety and release blockers
 
 1. Server authorization: all protected APIs must fail closed before mock fallback, database access, SAM.gov calls, or AI execution. Regression proof must cover anonymous GET and POST paths.
-2. Role authorization: the schema and README define owner/admin/operator/coach/viewer, but most mutations only check authentication. Each protected action needs a server-side role policy with positive and negative tests.
+2. Role authorization: remediated by the server-side action matrix in `docs/api-authorization-policy.md`, enforced before protected product mutations and admin reads, with pure role tests and authenticated positive/negative smoke coverage.
 3. Production data path: there is no migration history, production database target, backup policy implementation, or restore evidence. `prisma db push` is demo tooling, not a production migration strategy.
 4. AWS operations: no infrastructure as code, deploy target, health check, structured logs/metrics, alarms, rollback runbook, cost budget, or live environment readback exists.
 5. AI governance: live providers can receive opportunity and organization context, but allowed inputs, provider terms, retention, evaluations, monitoring, cost bounds, and human escalation are not approved or tested.
@@ -48,7 +48,7 @@ No exceptions are approved. This audit does not authorize merge, deployment, or 
 
 ## Near-term reliability work
 
-- Add an explicit API authorization policy matrix and enforce write roles consistently.
+- Keep the API authorization policy matrix and role-boundary regression coverage current as protected actions are added.
 - Replace schema push with reviewed Prisma migrations and add rollback/restore rehearsal.
 - Define production AWS architecture in IaC with environment isolation, managed secrets, encrypted RDS/S3, retention, alarms, budgets, and least-privilege IAM.
 - Add rate limiting and abuse controls to login, registration, AI, and SAM.gov routes.
@@ -74,6 +74,9 @@ Scope:
 - Resolve roles from the authenticated user's current organization.
 - Reject unknown compliance-profile fields rather than spreading request data into Prisma.
 - Add anonymous API boundary checks to the authenticated demo smoke.
+- Enforce a centralized owner/admin/operator/coach/viewer action matrix before protected product mutations and admin reads.
+- Resolve multiple role rows deterministically and default missing or unknown roles to viewer.
+- Reject workflow assignees from outside the authenticated user's organization.
 
 Success criteria:
 
@@ -85,10 +88,13 @@ Success criteria:
 ## Verification outcome
 
 - `npm run lint`: passed.
+- `npm test`: eight authorization-policy and tenant-boundary tests passed.
 - `npm run build`: passed with Next.js route generation and TypeScript checks.
 - `npm audit --omit=dev --audit-level=high`: zero known production dependency vulnerabilities reported.
 - Strict database demo smoke: passed against the optimized build on `127.0.0.1:3020`.
 - Authorization matrix: every protected product API method tested returned `401` without a session.
+- Authenticated role matrix: viewer writes/admin reads were denied; coach AI was allowed while supplier writes were denied; operator supplier writes passed authorization while admin reads were denied; admin reads were allowed.
+- Cross-organization workflow assignment returned `403` before mutation.
 - Legacy auth: `POST /api/auth` returned `410` and did not set a cookie.
 - Tenant input boundary: a compliance update containing a client-supplied `organizationId` returned `400`.
 - Authenticated workflow: dashboard, saved-search sync, opportunity detail, suppliers, workflows, AI analysis, persisted proposal draft, and workflow proof checks passed.
@@ -96,7 +102,7 @@ Success criteria:
 
 One initial strict-data smoke attempt returned Prisma `P1001` for local PostgreSQL while the container later reported healthy; an immediate rerun passed. This is treated as evidence for the unresolved health/readiness and database-operations work, not hidden as a green production signal.
 
-The last merged `main` GitHub Actions run was successful, but this working-tree change has no pull request or exact-change CI run. No production deployment or live AWS verification occurred.
+PR #3 merged the initial adoption and remediation as `c0c1516ffaed6e6caf44b3166fc7fd0d6508c8cb`; post-merge Demo Smoke run `29356145624` passed on `main`. This follow-up role-policy change remains subject to its own pull request and exact-change CI before merge. No production deployment or live AWS verification occurred.
 
 ## Market experiment
 
@@ -104,7 +110,7 @@ Invite one real small-business contractor to use the saved-search-to-workflow lo
 
 ## Operational-validation exit criteria
 
-1. Merge the adoption and remediation through an approved pull request with required checks.
+1. Complete: the initial adoption and remediation merged through PR #3 with required checks and a green post-merge run.
 2. Run a bounded pilot using non-sensitive or explicitly approved data.
 3. Capture role-boundary, migration, recovery, observability, and AI-provider evidence.
 4. Record the exact commit, workflow runs, environment target, smoke result, unresolved risks, and any approved exceptions.

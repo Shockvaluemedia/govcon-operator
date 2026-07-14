@@ -58,6 +58,117 @@ async function main() {
 
   console.log(`  ✓ User: ${user.email} (owner)`);
 
+  const roleFixtures = [
+    {
+      id: "user-demo-admin",
+      email: "admin@govcon-operator.com",
+      firstName: "Demo",
+      lastName: "Admin",
+      role: "admin" as const,
+    },
+    {
+      id: "user-demo-operator",
+      email: "operator@govcon-operator.com",
+      firstName: "Demo",
+      lastName: "Operator",
+      role: "operator" as const,
+    },
+    {
+      id: "user-demo-coach",
+      email: "coach@govcon-operator.com",
+      firstName: "Demo",
+      lastName: "Coach",
+      role: "coach" as const,
+    },
+    {
+      id: "user-demo-viewer",
+      email: "viewer@govcon-operator.com",
+      firstName: "Demo",
+      lastName: "Viewer",
+      role: "viewer" as const,
+    },
+  ];
+
+  for (const fixture of roleFixtures) {
+    const fixtureUser = await prisma.user.upsert({
+      where: { id: fixture.id },
+      update: {
+        email: fixture.email,
+        firstName: fixture.firstName,
+        lastName: fixture.lastName,
+        organizationId: org.id,
+      },
+      create: {
+        id: fixture.id,
+        email: fixture.email,
+        firstName: fixture.firstName,
+        lastName: fixture.lastName,
+        cognitoId: `demo-cognito:${fixture.email}`,
+        organizationId: org.id,
+      },
+    });
+
+    await prisma.userRole.upsert({
+      where: {
+        userId_organizationId_role: {
+          userId: fixtureUser.id,
+          organizationId: org.id,
+          role: fixture.role,
+        },
+      },
+      update: {},
+      create: {
+        userId: fixtureUser.id,
+        organizationId: org.id,
+        role: fixture.role,
+      },
+    });
+  }
+
+  console.log("  ✓ Role boundary users: admin, operator, coach, viewer");
+
+  const externalOrg = await prisma.organization.upsert({
+    where: { id: "org-demo-external" },
+    update: {},
+    create: {
+      id: "org-demo-external",
+      name: "External Demo Organization",
+      naicsCodes: [],
+      pscCodes: [],
+    },
+  });
+
+  const externalUser = await prisma.user.upsert({
+    where: { id: "user-external-001" },
+    update: { organizationId: externalOrg.id },
+    create: {
+      id: "user-external-001",
+      email: "external@govcon-operator.com",
+      firstName: "External",
+      lastName: "Viewer",
+      cognitoId: "demo-cognito:external@govcon-operator.com",
+      organizationId: externalOrg.id,
+    },
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_organizationId_role: {
+        userId: externalUser.id,
+        organizationId: externalOrg.id,
+        role: "viewer",
+      },
+    },
+    update: {},
+    create: {
+      userId: externalUser.id,
+      organizationId: externalOrg.id,
+      role: "viewer",
+    },
+  });
+
+  console.log("  ✓ Cross-organization boundary fixture");
+
   // Create compliance profile
   await prisma.complianceProfile.upsert({
     where: { organizationId: org.id },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
 import { mockComplianceProfile, complianceChecklist } from "@/data/mock-compliance";
 import { z } from "zod";
@@ -87,12 +88,11 @@ export async function GET(request: NextRequest) {
 
 // PUT /api/compliance - Update compliance profile
 export async function PUT(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("compliance:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const parsed = complianceUpdateSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json(

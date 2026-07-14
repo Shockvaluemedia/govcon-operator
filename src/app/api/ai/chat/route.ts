@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chat } from "@/services/ai-service";
-import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import prisma from "@/lib/prisma";
 import { v4 as uuidv4 } from "uuid";
 
 // POST /api/ai/chat - Send message to AI assistant
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authorization = await authorizeApiAction("ai:execute");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
   const body = await request.json();
   const { message, sessionId } = body;

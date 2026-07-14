@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { authorizeApiAction } from "@/lib/api-authorization";
 import { databaseMeta, requiresDatabase } from "@/lib/data-mode";
 import { mockSuppliers } from "@/data/mock-suppliers";
 import type { Prisma } from "@prisma/client";
@@ -99,12 +100,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/suppliers - Create a new supplier
 export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authorization = await authorizeApiAction("suppliers:manage");
+  if (!authorization.ok) return authorization.response;
+  const { user } = authorization;
 
+  try {
     const body = createSupplierSchema.parse(await request.json());
 
     const supplier = await prisma.supplier.create({

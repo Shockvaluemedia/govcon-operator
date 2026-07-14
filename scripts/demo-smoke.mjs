@@ -3,7 +3,7 @@ const demoEmail = process.env.SMOKE_DEMO_EMAIL ?? "demo@govcon-operator.com";
 const demoPassword = process.env.SMOKE_DEMO_PASSWORD ?? "demo-password";
 const cookies = new Map();
 
-function storeCookies(response) {
+function storeCookies(response, jar = cookies) {
   const setCookies =
     typeof response.headers.getSetCookie === "function"
       ? response.headers.getSetCookie()
@@ -13,12 +13,12 @@ function storeCookies(response) {
     const [pair] = setCookie.split(";");
     const separatorIndex = pair.indexOf("=");
     if (separatorIndex === -1) continue;
-    cookies.set(pair.slice(0, separatorIndex), pair.slice(separatorIndex + 1));
+    jar.set(pair.slice(0, separatorIndex), pair.slice(separatorIndex + 1));
   }
 }
 
-function cookieHeader() {
-  return Array.from(cookies.entries())
+function cookieHeader(jar = cookies) {
+  return Array.from(jar.entries())
     .map(([name, value]) => `${name}=${value}`)
     .join("; ");
 }
@@ -101,6 +101,66 @@ async function login() {
 
   assert(cookies.has("access_token"), "Login did not set an access_token cookie");
   console.log(`ok auth login ${demoEmail}`);
+}
+
+async function loginAs(email) {
+  const jar = new Map();
+  const response = await fetch(`${baseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: demoPassword }),
+  });
+
+  assert(response.ok, `Role fixture login failed for ${email}: ${response.status}`);
+  storeCookies(response, jar);
+  assert(jar.has("access_token"), `Role fixture login did not set a cookie for ${email}`);
+  return jar;
+}
+
+async function expectSessionStatus(jar, method, path, body, expectedStatus, label) {
+  const headers = new Headers();
+  headers.set("Cookie", cookieHeader(jar));
+  if (body !== undefined) headers.set("Content-Type", "application/json");
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  assert(
+    response.status === expectedStatus,
+    `${label} returned ${response.status}; expected ${expectedStatus}`
+  );
+  console.log(`ok role boundary ${label}`);
+}
+
+async function checkRoleBoundaries(opportunityId) {
+  const viewer = await loginAs("viewer@govcon-operator.com");
+  await expectSessionStatus(viewer, "GET", "/api/workflows", undefined, 200, "viewer read");
+  await expectSessionStatus(viewer, "PATCH", "/api/workflows", {}, 403, "viewer write denied");
+  await expectSessionStatus(viewer, "GET", "/api/admin", undefined, 403, "viewer admin denied");
+
+  const coach = await loginAs("coach@govcon-operator.com");
+  await expectSessionStatus(coach, "POST", "/api/ai/chat", {}, 400, "coach AI allowed");
+  await expectSessionStatus(coach, "POST", "/api/suppliers", {}, 403, "coach supplier write denied");
+
+  const operator = await loginAs("operator@govcon-operator.com");
+  await expectSessionStatus(operator, "POST", "/api/suppliers", {}, 400, "operator supplier write allowed");
+  await expectSessionStatus(operator, "POST", "/api/opportunities", {}, 403, "operator global import denied");
+  await expectSessionStatus(operator, "GET", "/api/admin", undefined, 403, "operator admin denied");
+
+  const admin = await loginAs("admin@govcon-operator.com");
+  await expectSessionStatus(admin, "GET", "/api/admin", undefined, 200, "admin read allowed");
+
+  await expectSessionStatus(
+    cookies,
+    "POST",
+    "/api/workflows",
+    { opportunityId, assignedTo: "user-external-001" },
+    403,
+    "cross-organization assignment denied"
+  );
 }
 
 async function checkComplianceInputBoundary() {
@@ -300,6 +360,7 @@ async function main() {
 
   await checkProposalDraft(opportunities[0].id);
   await checkWorkflowCommandCenter(opportunities[0].id);
+  await checkRoleBoundaries(opportunities[0].id);
 
   console.log("GovCon demo smoke passed");
 }
