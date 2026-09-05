@@ -21,9 +21,11 @@ npm install
 # Set up environment variables
 cp .env.example .env.local
 
-# Start local Postgres, push schema, and seed demo tenant data
+# Start local Postgres, apply reviewed migrations, and seed demo tenant data
 docker compose up -d
-npm run db:push
+npm run db:deploy
+npm run db:status
+npm run db:drift:check
 npm run db:seed
 
 # Run development server
@@ -34,6 +36,9 @@ npm run build
 
 # Run the authenticated database-backed smoke against a running app
 SMOKE_BASE_URL=http://127.0.0.1:3000 npm run demo:smoke
+
+# Rehearse a non-destructive logical backup and isolated restore
+npm run db:recovery:rehearse
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to see the landing page.
@@ -66,7 +71,8 @@ src/
 └── types/                 # TypeScript type definitions
 
 prisma/
-└── schema.prisma          # Database schema (PostgreSQL)
+├── schema.prisma          # Database schema (PostgreSQL)
+└── migrations/            # Immutable reviewed migration history
 ```
 
 ## Readiness
@@ -75,14 +81,16 @@ The app supports a seeded local pilot mode. Set `GOVCON_DEMO_AUTH=true`, run the
 
 For production, set `GOVCON_DEMO_AUTH=false` and `GOVCON_STRICT_DATA=true`, then provide real Cognito, PostgreSQL, S3, AI, and SAM.gov configuration. The Cognito flow currently expects an app client without a client secret.
 
-The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` runs lint and authorization-policy tests, prepares a seeded PostgreSQL database, builds the app, starts Next.js, and executes the authenticated demo smoke.
+The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` runs lint and authorization-policy tests, deploys reviewed migrations to a fresh PostgreSQL database, checks status and drift, seeds synthetic data, rehearses backup/restore, builds the app, starts Next.js, and executes the authenticated demo smoke.
+
+Database deployment, one-time baseline, rollback, and restore procedures are in [the database migration and recovery runbook](docs/database-migration-recovery.md). The latest bounded evidence is recorded in [the 2026-09-05 migration and recovery report](docs/migration-recovery-evidence-2026-09-05.md).
 
 Known MVP gaps:
 - Visual polish still needs a full `DESIGN.md` token pass across the dashboard and auth surfaces.
 - Production Cognito, S3, AI, and SAM.gov modes require real environment configuration.
 - SAM.gov saved searches run in no-key mode locally; add `SAM_GOV_API_KEY` for live solicitation imports.
 - Proposal drafts are generated, persisted as opportunity notes, and exportable as Markdown; DOCX/PDF export is not built yet.
-- Production is Constitution `NO-GO` until AWS infrastructure, migrations, recovery, observability, rate limits, AI data governance, and live deployment evidence exist. See [the current Constitution audit](docs/constitution-audit-2026-07-14.md).
+- Production is Constitution `NO-GO` until AWS infrastructure, production backup/restore evidence, observability, rate limits, AI data governance, and live deployment evidence exist. See [the current Constitution audit](docs/constitution-audit-2026-07-14.md).
 
 ## Features
 
@@ -103,7 +111,7 @@ Known MVP gaps:
 | Admin Dashboard | Role-gated API and demo-ready UI |
 | Settings | Demo-ready |
 | API Routes | Verified sessions plus server-side product-action roles; production hardening remains in progress |
-| Database Schema | ✅ Prisma schema + seeded local pilot data |
+| Database Schema | Reviewed Prisma migration, drift gate, seeded pilot data, and synthetic backup/restore rehearsal |
 | AI Service Abstraction | Mock/OpenAI/Bedrock provider layer |
 | Integration Adapters | Adapter scaffolding; live keys required |
 
