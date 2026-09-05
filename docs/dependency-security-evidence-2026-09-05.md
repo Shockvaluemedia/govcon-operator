@@ -1,6 +1,6 @@
 # Dependency Security Evidence - 2026-09-05
 
-Status: local remediation proof complete; exact-change CI pending
+Status: local remediation proof and code-bearing exact-change CI complete
 
 Starting repository state: `main` at `477b7220b11cbd5a5e8d76f18b12247326e78bc2`
 
@@ -58,4 +58,16 @@ The correction pins Node.js 22.23.2 and npm 10.9.8, regenerates the lockfile wit
 
 Audit results are point-in-time evidence against the npm advisory database and the exact lockfile. They do not prove future advisory absence or exploit impossibility. This change does not deploy the application, inspect AWS, approve production, or close the remaining infrastructure, recovery, observability, rate-limit, AI-governance, and live-environment blockers.
 
-Exact-change GitHub Actions must reproduce install, full-tree audit, migration/recovery, build, and authenticated smoke before this branch is merge-ready.
+Exact-change GitHub Actions reproduced install, full-tree audit, migration/recovery, build, and authenticated smoke as recorded below.
+
+## Exact-Change CI
+
+- Code-bearing commit: `3fce9b90e82e2a92f53f57bd5b3ce7e54ea2c43c`.
+- Workflow: `Demo Smoke`.
+- Run: [33998544508](https://github.com/Shockvaluemedia/govcon-operator/actions/runs/33998544508).
+- Started: `2026-09-05T23:23:29Z`.
+- Completed: `2026-09-05T23:24:39Z`.
+- Result: passed in 1 minute 10 seconds.
+- Successful gates: pinned Node/npm verification, clean install, high-severity audit, lint, authorization tests, fresh migration deploy/status/drift, seed, PostgreSQL backup/restore, optimized build, application readiness, authenticated smoke, and cleanup.
+
+The final documentation-only evidence commit must pass the same workflow before the pull request head is merge-ready.
