@@ -64,10 +64,20 @@ jobs:
       - name: Test authorization policy
         run: npm test
 
-      - name: Prepare demo database
+      - name: Apply reviewed database migrations
         run: |
-          npm run db:push
+          npm run db:deploy
+          npm run db:status
+          npm run db:drift:check
+
+      - name: Seed demo database
+        run: |
           npm run db:seed
+
+      - name: Rehearse PostgreSQL backup and restore
+        env:
+          RECOVERY_EVIDENCE_PATH: /tmp/govcon-recovery-evidence.json
+        run: npm run db:recovery:rehearse
 
       - name: Build
         run: npm run build

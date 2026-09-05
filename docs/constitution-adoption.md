@@ -41,16 +41,17 @@ Tenant identity MUST come from the verified session. Client-provided organizatio
 
 | Surface | Tier | Target | Current evidence |
 | --- | --- | --- | --- |
-| Production PostgreSQL customer and bid data | A | 8h RTO / 4h RPO, encrypted backups retained at least 30 days, quarterly restore test | Not implemented or verified. |
+| Production PostgreSQL customer and bid data | A | 8h RTO / 4h RPO, encrypted backups retained at least 30 days, quarterly restore test | Reviewed migration and synthetic logical-restore path exist; production RDS backup, retention, restore, and cutover evidence remain absent. |
 | Production S3 customer documents | A | Versioning/recovery and retention aligned to customer obligations | Not implemented or verified. |
 | Operator logs and audit evidence | B | 24h RTO / 12h RPO, annual restore test | Schema exists; operational storage and restore evidence are absent. |
-| Seeded local/CI demo data | C/D | 72h/24h or disposable | Recreated by schema push and seed; not production evidence. |
+| Seeded local/CI demo data | C/D | 72h/24h or disposable | Recreated by reviewed migrations and seed; logical backup/restore is rehearsed in CI. This is not production evidence. |
 
 ## Environment rules
 
 - Local demo: `GOVCON_DEMO_AUTH=true`; seeded database; mock AI allowed.
 - Optimized-build proof in local/CI: may additionally use `GOVCON_DEMO_AUTH_ALLOW_PRODUCTION_BUILD=true`; this override is forbidden on public deployments.
 - Production: `GOVCON_DEMO_AUTH=false`, `GOVCON_STRICT_DATA=true`, real Cognito, RDS, S3, and managed secrets.
+- Shared and production databases use `prisma migrate deploy`; `prisma db push` is not an approved deployment path.
 - Production AI and live SAM.gov processing require explicit provider ownership, rate/cost controls, failure handling, monitoring, and approved data boundaries.
 
 ## External obligations

@@ -33,14 +33,14 @@ No exceptions are approved. This audit does not authorize merge, deployment, or 
 | AWS architecture | Cognito, RDS, S3, SAM.gov, and AI seams exist in code. There is no production IaC, account/region/environment target, deployment workflow, health endpoint, alarms, budgets, or vendor-exit record. | Production blocker. |
 | Security, privacy, tenancy | Tenant filters exist on major organization-owned records. Anonymous probes reproduced access to protected data/AI routes; the bounded remediation closes this and retires legacy mock-cookie login. A centralized product-action role matrix now protects shared mutations and admin reads, with deterministic role resolution and cross-organization workflow-assignee denial. Rate limits remain absent. | Immediate auth and role blockers remediated; production remains no-go. |
 | UI and accessibility | Primary routes are understandable, responsive, and keyboard-addressable at a basic level. The palette/radius still conflict with `DESIGN.md`; sortable cards expose nested button semantics; mobile search text clips; loading/error/permission recovery is inconsistent. | Near-term remediation. No WCAG conformance claim. |
-| Engineering and operations | Lint, policy tests, build, seeded DB setup, audit-log writes, and authenticated smoke exist. There are no migration files, structured production telemetry, alert ownership, incident/runbook set, or restore test. Exact-change CI remains a merge gate for every follow-up. | Demo-ready engineering; production blocker. |
+| Engineering and operations | Lint, policy tests, build, reviewed Prisma migration, drift detection, seeded DB setup, synthetic logical-restore rehearsal, audit-log writes, and authenticated smoke exist. Structured production telemetry, alert ownership, the broader incident/runbook set, and production restore evidence remain absent. Exact-change CI remains a merge gate for every follow-up. | Demo-ready engineering; production blocker. |
 | Market impact | The strongest wedge is a recurring saved-search-to-bid-command loop. The app has shipped capability but no observed customer action or commercial proof. | Run a measured pilot before feature expansion. |
 
 ## Immediate safety and release blockers
 
 1. Server authorization: all protected APIs must fail closed before mock fallback, database access, SAM.gov calls, or AI execution. Regression proof must cover anonymous GET and POST paths.
 2. Role authorization: remediated by the server-side action matrix in `docs/api-authorization-policy.md`, enforced before protected product mutations and admin reads, with pure role tests and authenticated positive/negative smoke coverage.
-3. Production data path: there is no migration history, production database target, backup policy implementation, or restore evidence. `prisma db push` is demo tooling, not a production migration strategy.
+3. Production data path: the repository now has reviewed migration history, a `migrate deploy`/drift gate, and synthetic logical-restore proof. A production database target, backup-policy implementation, production restore/cutover evidence, and measured Tier A RTO/RPO remain absent.
 4. AWS operations: no infrastructure as code, deploy target, health check, structured logs/metrics, alarms, rollback runbook, cost budget, or live environment readback exists.
 5. AI governance: live providers can receive opportunity and organization context, but allowed inputs, provider terms, retention, evaluations, monitoring, cost bounds, and human escalation are not approved or tested.
 6. Sensitive documents and obligations: uploaded files may contain Restricted material. External obligations are unresolved; no FedRAMP, CMMC, FAR/DFARS, CUI, or legal compliance claim is supported.
@@ -49,7 +49,7 @@ No exceptions are approved. This audit does not authorize merge, deployment, or 
 ## Near-term reliability work
 
 - Keep the API authorization policy matrix and role-boundary regression coverage current as protected actions are added.
-- Replace schema push with reviewed Prisma migrations and add rollback/restore rehearsal.
+- Keep migration deploy, drift detection, rollback planning, and synthetic restore rehearsal mandatory; add production RDS backup/restore and cutover evidence before release.
 - Define production AWS architecture in IaC with environment isolation, managed secrets, encrypted RDS/S3, retention, alarms, budgets, and least-privilege IAM.
 - Add rate limiting and abuse controls to login, registration, AI, and SAM.gov routes.
 - Add a health/readiness endpoint that distinguishes application health, database reachability, and optional dependency state without exposing secrets.
@@ -115,3 +115,11 @@ Invite one real small-business contractor to use the saved-search-to-workflow lo
 3. Capture role-boundary, migration, recovery, observability, and AI-provider evidence.
 4. Record the exact commit, workflow runs, environment target, smoke result, unresolved risks, and any approved exceptions.
 5. Only then consider changing the adoption status to `OPERATIONALLY VALIDATED`; production still requires its own release-readiness decision.
+
+## Follow-up Evidence - 2026-09-05
+
+The migration/recovery follow-up adds initial Prisma migration `20260905000000_initial`, removes the repository's `db push` deployment command, and makes CI deploy migrations, verify status and drift, seed synthetic data, and perform an isolated PostgreSQL logical backup/restore rehearsal. Local clean-database migration, zero-drift, exact fingerprint, relational canary, and cleanup checks passed. See `docs/migration-recovery-evidence-2026-09-05.md` and `docs/database-migration-recovery.md`.
+
+This closes the repository-mechanics portion of blocker 3. It does not change the controlled-pilot or production verdict because no production RDS target, retention/encryption readback, production restore, application cutover, or Tier A RTO/RPO evidence exists.
+
+The same verification pass found seven high-severity advisories in the existing production dependency graph via `npm audit --omit=dev --audit-level=high`. No dependency was added by the migration/recovery change. Next.js and Prisma-transitive remediation requires a separately tested dependency update and remains an unresolved release gate.
