@@ -2,12 +2,17 @@
   "name": "govcon-operator",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test src/lib/__tests__/*.test.ts",
+    "security:audit": "npm audit --audit-level=high",
+    "security:audit:production": "npm audit --omit=dev --audit-level=high",
     "demo:smoke": "node scripts/demo-smoke.mjs",
     "db:generate": "dotenv -e .env.local -- prisma generate",
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
@@ -46,7 +51,7 @@
     "date-fns": "^4.3.0",
     "jose": "^6.2.3",
     "lucide-react": "^1.17.0",
-    "next": "^16.2.10",
+    "next": "^16.3.4",
     "openai": "^6.39.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -57,21 +62,19 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "next": {
-      "postcss": "8.5.16"
-    }
+    "deepmerge-ts": "8.0.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.10",
+    "eslint-config-next": "^16.3.4",
     "prisma": "^6.19.3",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.22.3",
     "typescript": "^5"
   }
