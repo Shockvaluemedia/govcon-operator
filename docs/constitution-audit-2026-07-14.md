@@ -123,3 +123,9 @@ The migration/recovery follow-up adds initial Prisma migration `20260905000000_i
 This closes the repository-mechanics portion of blocker 3. It does not change the controlled-pilot or production verdict because no production RDS target, retention/encryption readback, production restore, application cutover, or Tier A RTO/RPO evidence exists.
 
 The same verification pass found seven high-severity advisories in the existing production dependency graph via `npm audit --omit=dev --audit-level=high`. No dependency was added by the migration/recovery change. Next.js and Prisma-transitive remediation requires a separately tested dependency update and remains an unresolved release gate.
+
+## Dependency Security Follow-up - 2026-09-05
+
+The dependency-remediation follow-up updates Next.js and its build chain to patched releases, applies a narrow `deepmerge-ts` 8.0.1 override for Prisma's config loader, patches newly surfaced development-tool transitive findings, pins current GitHub Actions releases by immutable commit, declares Node.js 22 or newer, and adds a full-tree high-severity audit to CI. Local clean install, complete and production-only audits, circular-object regression, Prisma generation/migration/drift, restore rehearsal, build, and authenticated smoke all pass with zero known vulnerabilities reported. See `docs/dependency-security-evidence-2026-09-05.md`.
+
+Exact-change CI remains required before merge. This closes the seven known dependency findings only at the tested lockfile and advisory timestamp; it does not change the production `NO-GO` verdict or close AWS, production recovery, observability, rate-limit, AI-governance, and live-deployment blockers.

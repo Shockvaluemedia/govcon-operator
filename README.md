@@ -14,9 +14,14 @@ AI-powered government contracting platform for small businesses. Discover opport
 
 ## Getting Started
 
+Use Node.js 22.23.2 and npm 10.9.8, as declared by `.nvmrc` and `packageManager`.
+
 ```bash
 # Install dependencies
 npm install
+
+# Fail on known high-severity dependency advisories
+npm run security:audit
 
 # Set up environment variables
 cp .env.example .env.local
@@ -81,9 +86,9 @@ The app supports a seeded local pilot mode. Set `GOVCON_DEMO_AUTH=true`, run the
 
 For production, set `GOVCON_DEMO_AUTH=false` and `GOVCON_STRICT_DATA=true`, then provide real Cognito, PostgreSQL, S3, AI, and SAM.gov configuration. The Cognito flow currently expects an app client without a client secret.
 
-The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` runs lint and authorization-policy tests, deploys reviewed migrations to a fresh PostgreSQL database, checks status and drift, seeds synthetic data, rehearses backup/restore, builds the app, starts Next.js, and executes the authenticated demo smoke.
+The GitHub Actions workflow at `.github/workflows/demo-smoke.yml` uses commit-pinned GitHub Actions and runs a full high-severity dependency audit, lint and authorization-policy tests, reviewed migrations against fresh PostgreSQL, status and drift checks, synthetic seed and backup/restore rehearsal, the optimized build, and authenticated demo smoke.
 
-Database deployment, one-time baseline, rollback, and restore procedures are in [the database migration and recovery runbook](docs/database-migration-recovery.md). The latest bounded evidence is recorded in [the 2026-09-05 migration and recovery report](docs/migration-recovery-evidence-2026-09-05.md).
+Database deployment, one-time baseline, rollback, and restore procedures are in [the database migration and recovery runbook](docs/database-migration-recovery.md). Bounded evidence is recorded in the [migration and recovery report](docs/migration-recovery-evidence-2026-09-05.md) and [dependency security report](docs/dependency-security-evidence-2026-09-05.md).
 
 Known MVP gaps:
 - Visual polish still needs a full `DESIGN.md` token pass across the dashboard and auth surfaces.
