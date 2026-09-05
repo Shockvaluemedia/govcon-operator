@@ -1,10 +1,12 @@
 # Migration and Recovery Evidence - 2026-09-05
 
-Status: local synthetic proof complete; exact-change CI pending
+Status: local synthetic proof and code-bearing exact-change CI complete
 
 Starting repository state: `main` at `f3bc75e8f6c4351610f562b9fc62a908ed1d567a`
 
 Branch: `agent/govcon-migrations-recovery`
+
+Pull request: [#5](https://github.com/Shockvaluemedia/govcon-operator/pull/5)
 
 ## Scope
 
@@ -64,3 +66,15 @@ Controlled external pilot and production remain `NO-GO` under the current Consti
 - Cleanup: application server stopped, temporary restore database absent, disposable source database dropped, and local PostgreSQL service stopped.
 
 `npm audit --omit=dev --audit-level=high` remains a failed gate with seven high-severity advisories in the pre-existing dependency graph, including Next.js and Prisma-transitive findings. This change adds no dependency. Dependency remediation requires its own framework/ORM compatibility pass and remains part of the production `NO-GO` boundary.
+
+## Exact-Change CI
+
+- Code-bearing commit: `faf12da24b25bb3313646cbec4cc744da41c68da`.
+- Workflow: `Demo Smoke`.
+- Run: [33997205002](https://github.com/Shockvaluemedia/govcon-operator/actions/runs/33997205002).
+- Started: `2026-09-05T22:54:16Z`.
+- Completed: `2026-09-05T22:55:40Z`.
+- Result: passed in 1 minute 24 seconds.
+- Successful gates: dependency install, lint, authorization tests, fresh migration deploy/status/drift, seed, PostgreSQL backup/restore rehearsal, optimized build, application readiness, authenticated demo smoke, and container cleanup.
+
+The final documentation-only evidence commit must also pass the same workflow before the pull request head is merge-ready.
