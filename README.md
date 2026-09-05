@@ -14,6 +14,8 @@ AI-powered government contracting platform for small businesses. Discover opport
 
 ## Getting Started
 
+Use Node.js 22.23.2 and npm 10.9.8, as declared by `.nvmrc` and `packageManager`.
+
 ```bash
 # Install dependencies
 npm install
